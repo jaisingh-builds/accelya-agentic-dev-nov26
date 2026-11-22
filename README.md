@@ -8,18 +8,16 @@ Region `ap-south-1`. Synthetic airline data only - no real customer data, ever.
 ```bash
 git clone https://github.com/jaisingh-builds/accelya-agentic-dev-nov26.git
 cd accelya-agentic-dev-nov26
-git checkout -b day1-<your-id>                 # e.g. day1-priya
+source day1/scripts/env.sh <your-id>          # sets L, F, B, LG
+git checkout -b day1-$L
 bash day1/scripts/verify_setup.sh              # all PASS before Lab 1
 
 # Lab 1 - prompt -> two architectures (Bedrock)
-python3 day1/scripts/arch_options.py --learner <your-id>
+python3 day1/scripts/arch_options.py --learner $L
 
 # Lab 2 - deploy S3 -> Lambda -> CloudWatch
-cd day1
-sam build
-sam deploy --stack-name accelya-m1-<your-id> --region ap-south-1 \
-  --capabilities CAPABILITY_NAMED_IAM --resolve-s3 \
-  --parameter-overrides LearnerId=<your-id>
+cd day1 && sam build
+sam deploy --stack-name accelya-m1-$L $F --parameter-overrides LearnerId=$L
 ```
 
 Full steps: see the Day 1 slides (Lab 1-3 playbooks).
