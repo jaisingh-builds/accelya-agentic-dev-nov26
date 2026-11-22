@@ -3,7 +3,7 @@ Every time an agency uploads a daily ticket-issue file, finance must see how man
 
 ## Technical prompt (YOU fill the <FILL> parts, then delete this line)
 
-**Role:** You are designing for Accelya's settlement platform on AWS (region ap-south-1).
+**Role:** You are designing for Accelya's settlement platform on AWS (region us-east-1).
 
 **Input:** CSV file `ticket_issue_<airline>_<date>.csv`, ~<FILL: file size> , columns: pnr, ticket_number, airline_code, fare_class, od_pair, issue_date, fare_amount, currency, agency_iata.
 

@@ -17,7 +17,7 @@ command -v aws >/dev/null && pass "aws cli $(aws --version 2>&1 | awk '{print $1
 command -v sam >/dev/null && pass "sam cli $(sam --version | awk '{print $NF}')" || fail "sam cli" "install AWS SAM CLI"
 
 REGION=$(aws configure get region 2>/dev/null || true); REGION=${AWS_DEFAULT_REGION:-$REGION}
-[ "$REGION" = "ap-south-1" ] && pass "region ap-south-1" || fail "region is '${REGION:-unset}'" "export AWS_DEFAULT_REGION=ap-south-1"
+case "$REGION" in us-east-1|us-west-2) pass "region $REGION";; *) fail "region is '${REGION:-unset}'" "source day1/scripts/env.sh <id>  (sets us-east-1)";; esac
 
 ID=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)
 [ -n "$ID" ] && pass "signed in as $ID" || fail "AWS credentials" "paste the Pluralsight sandbox keys (aws configure)"

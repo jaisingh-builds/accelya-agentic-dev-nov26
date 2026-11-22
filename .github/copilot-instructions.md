@@ -9,7 +9,7 @@ Read this file before generating anything in this repository.
 - Glossary: `glossary/airline.md`.
 
 ## Platform
-- AWS, region `ap-south-1` only. Python 3.12. Infrastructure as code with AWS SAM - no console click-ops.
+- AWS, region `us-east-1` only (Pluralsight sandbox allows us-east-1 and us-west-2). Python 3.12. Infrastructure as code with AWS SAM - no console click-ops.
 - Bedrock via `bedrock-runtime` Converse API with an explicit model id.
 - Sandbox limits: max 10 Lambda functions for the whole course, memory <= 2048 MB, no public S3 buckets,
   max 50 Bedrock calls / 20,000 tokens per learner.

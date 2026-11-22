@@ -20,8 +20,8 @@ try:
 except ImportError:
     sys.exit("boto3 missing. Fix: python3 -m pip install -U boto3")
 
-REGION = os.getenv("AWS_DEFAULT_REGION", "ap-south-1")
-MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "apac.anthropic.claude-3-5-sonnet-20241022-v2:0")
+REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-sonnet-20241022-v2:0")
 DAY1 = Path(__file__).resolve().parent.parent
 COUNTER = DAY1 / "outputs" / ".bedrock_calls"
 MAX_DAY1_CALLS = 3
@@ -65,7 +65,7 @@ def main():
         code = e.response["Error"]["Code"]
         hints = {
             "AccessDeniedException": "Model access not granted in this sandbox - tell the trainer.",
-            "ValidationException": "Model id/profile not valid here - try BEDROCK_MODEL_ID=apac.anthropic.claude-3-5-haiku-20241022-v1:0",
+            "ValidationException": "Model id/profile not enabled here. List what is: aws bedrock list-inference-profiles --query \"inferenceProfileSummaries[].inferenceProfileId\" then export BEDROCK_MODEL_ID=<one of them>",
             "ThrottlingException": "Throttled - wait 30 s and retry once.",
         }
         sys.exit(f"Bedrock error {code}: {e.response['Error']['Message']}\nHint: {hints.get(code, 'show the trainer')}")

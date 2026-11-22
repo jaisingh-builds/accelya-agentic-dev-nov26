@@ -2,7 +2,8 @@
 # End-of-day cleanup. Usage: bash day1/scripts/cleanup_day1.sh <learner-id>
 set -euo pipefail
 L=${1:?usage: cleanup_day1.sh <learner-id>}
-export AWS_DEFAULT_REGION=ap-south-1
+export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+[ -n "${AWS_PROFILE:-}" ] || { aws configure list-profiles 2>/dev/null | grep -qx accelya && export AWS_PROFILE=accelya; }
 ACCT=$(aws sts get-caller-identity --query Account --output text)
 BUCKET="accelya-m1-${L}-${ACCT}"
 
@@ -12,7 +13,7 @@ aws s3 rm "s3://${BUCKET}" --recursive || true
 for STACK in "accelya-m1-${L}" "accelya-m1-${L}-dup"; do
   if aws cloudformation describe-stacks --stack-name "$STACK" >/dev/null 2>&1; then
     echo "Deleting stack $STACK ..."
-    sam delete --stack-name "$STACK" --no-prompts --region ap-south-1
+    sam delete --stack-name "$STACK" --no-prompts --region "$AWS_DEFAULT_REGION"
   fi
 done
 
