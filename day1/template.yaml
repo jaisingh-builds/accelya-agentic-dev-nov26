@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Accelya M1 - raw-zone ingest Lambda (S3 -> Lambda -> CloudWatch) plus a
+  cross-role probe (Lambda -> STS AssumeRole -> S3 list) used to learn
+  identity policy vs trust policy.
+
+Parameters:
+  LearnerId:
+    Type: String
+    Description: Your short learner id, lowercase (e.g. priya, rahul-k)
+    AllowedPattern: '^[a-z0-9-]{2,20}$'
+    ConstraintDescription: 2-20 chars, lowercase letters, digits, hyphen
+  TrustMode:
+    Type: String
+    AllowedValues: [open, locked]
+    Default: open
+    Description: open = reader role trusts the ingest role; locked = also demands an ExternalId
+  ProbeExternalId:
+    Type: String
+    Default: ''
+    Description: ExternalId the Lambda sends when assuming the reader role (blank = none)
+  ExistingRoleArn:
+    Type: String
+    Default: ''
+    Description: Leave blank. Set ONLY if your sandbox blocks iam:CreateRole (fallback mode, no probe).
+
+Conditions:
+  CreateRoles: !Equals [!Ref ExistingRoleArn, '']
+  TrustLocked: !Equals [!Ref TrustMode, locked]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Architectures: [x86_64]
+
+Resources:
+  # ---------- S3: your raw zone ----------
+  RawBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'accelya-m1-${LearnerId}-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ---------- IAM: identity the Lambda runs as ----------
+  IngestRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRoles
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-ingest-role'
+      AssumeRolePolicyDocument:            # TRUST policy: who may wear this role
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:                            # IDENTITY policy: what the role may do
+        - PolicyName: read-raw-zone
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}/raw/*'
+
+  # ---------- IAM: a second role the Lambda will try to assume ----------
+  ReaderRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRoles
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-reader-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { AWS: !GetAtt IngestRole.Arn }
+            Action: sts:AssumeRole
+            Condition: !If
+              - TrustLocked
+              - StringEquals: { 'sts:ExternalId': 'accelya-m1-partner' }
+              - !Ref AWS::NoValue
+      Policies:
+        - PolicyName: list-validated-zone
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}'
+                Condition:
+                  StringLike: { 's3:prefix': ['validated/*'] }
+
+  # Identity side of the hop: ingest role is ALLOWED to call sts:AssumeRole on the reader role.
+  # Kept as a separate policy to avoid a circular reference between the two roles.
+  IngestCanAssumeReader:
+    Type: AWS::IAM::Policy
+    Condition: CreateRoles
+    Properties:
+      PolicyName: assume-reader-role
+      Roles: [!Ref IngestRole]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !GetAtt ReaderRole.Arn
+
+  # ---------- Logs: explicit retention, never "Never Expire" ----------
+  IngestLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/accelya-m1-${LearnerId}-ingest'
+      RetentionInDays: 7
+
+  # ---------- Lambda ----------
+  IngestFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: IngestLogGroup
+    Properties:
+      FunctionName: !Sub 'accelya-m1-${LearnerId}-ingest'
+      CodeUri: src/ingest/
+      Handler: app.handler
+      Role: !If [CreateRoles, !GetAtt IngestRole.Arn, !Ref ExistingRoleArn]
+      Environment:
+        Variables:
+          LEARNER_ID: !Ref LearnerId
+          PROBE_ROLE_ARN: !If [CreateRoles, !GetAtt ReaderRole.Arn, '']
+          PROBE_EXTERNAL_ID: !Ref ProbeExternalId
+      Events:
+        RawUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref RawBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: raw/
+
+Outputs:
+  BucketName:
+    Value: !Ref RawBucket
+  FunctionName:
+    Value: !Ref IngestFunction
+  LogGroup:
+    Value: !Ref IngestLogGroup
+  IngestRoleArn:
+    Condition: CreateRoles
+    Value: !GetAtt IngestRole.Arn
+  ReaderRoleArn:
+    Condition: CreateRoles
+    Value: !GetAtt ReaderRole.Arn

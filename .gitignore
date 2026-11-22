@@ -1,0 +1,9 @@
+.aws-sam/
+__pycache__/
+*.pyc
+.env
+.aws/
+*.pem
+day1/outputs/.bedrock_calls
+.DS_Store
+samconfig.toml
