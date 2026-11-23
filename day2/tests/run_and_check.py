@@ -7,12 +7,12 @@
      non-empty error_type
   4. every log record conforms to docs/LOGGING_CONTRACT.md (via check_logs.py)
   5. no PII (passenger name, email, fare amount) appears in any log record
-  6. every SQS record is traceable: its log records carry its correlation_id, and m-10 (no
-     correlation attribute) carries one valid, newly minted id
+  6. every SQS record is traceable: its log records are found by message_id, and EVERY one of them
+     carries that record's correlation_id (for m-10, which has none, one valid newly minted id)
 
 Isolation: the handler runs in a SEPARATE Python process with an empty home folder, a throwaway
-working directory, no AWS credentials or config, and outbound network calls blocked. That is why
-you can safely run a peer's handler here. It is a classroom guard, not a security sandbox.
+working directory, no AWS credentials or config, and Python's standard socket calls blocked.
+These are Python-level guards for the classroom, not an OS sandbox: read peer code before running it.
 
 Run from the repo root:
     python3 day2/tests/run_and_check.py                    # your handler
@@ -157,28 +157,30 @@ def main():
     leaks = [l for l in lines if any(p in l for p in pii)]
     checks.append(("no PII or fare amounts in the logs", not leaks, f"{len(leaks)} record(s) leak PII" if leaks else ""))
 
-    # 6 - traceability, per record
+    # 6 - traceability, per record: group log records by message_id (or event_id); EVERY record for
+    #     that message must carry the same correlation_id - the given one, or one minted id for m-10
     why = []
     for mid, cid in given.items():
-        mine = records_for(mid)
-        if cid:
-            if not any(o.get("correlation_id") == cid for o in mine):
-                why.append(f"{mid}: no log record with correlation_id {cid}")
+        eid = body_event[mid]
+        mine = [o for o in recs if o.get("message_id") == mid or (eid and o.get("event_id") == eid)]
+        if not any(o.get("message_id") == mid for o in mine):
+            why.append(f"{mid}: no log record with message_id {mid!r} (log message_id on every per-record line)")
             continue
-        # no attribute (m-10): a minted id, valid, new, and the same on all of its records
         ids = {o.get("correlation_id") for o in mine}
-        if not mine:
-            why.append(f"{mid}: no log record (log message_id or event_id so it can be traced)")
+        if cid:
+            stray = sorted(str(i) for i in ids - {cid})
+            if stray:
+                why.append(f"{mid}: expected correlation_id {cid} on all {len(mine)} of its records, also found {', '.join(stray)}")
         elif len(ids) != 1:
-            why.append(f"{mid}: {len(ids)} different correlation_ids on its records")
+            why.append(f"{mid}: {len(ids)} different correlation_ids on its records (mint ONE and reuse it)")
         else:
-            m = ids.pop()
+            m = next(iter(ids))
             if not isinstance(m, str) or not re.match(CID_RULE, m) or m in given.values():
                 why.append(f"{mid}: minted correlation_id {m!r} is missing, invalid or reused")
     checks.append(("every record traceable by correlation_id (minted for m-10)", not why, "; ".join(why[:3])))
 
     shown = handler.relative_to(ROOT) if handler.is_relative_to(ROOT) else handler
-    print(f"Day 2 harness  ·  handler: {shown}  ·  isolated: separate process, empty HOME, no AWS creds, network blocked\n")
+    print(f"Day 2 harness  ·  handler: {shown}  ·  separate process, empty HOME, no AWS creds, Python sockets blocked\n")
     for name, ok, why in checks:
         print(("  PASS  " if ok else "  FAIL  ") + name + ("" if ok or not why else f"\n          {why}"))
     passed = sum(ok for _, ok, _ in checks)

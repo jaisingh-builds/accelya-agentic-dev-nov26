@@ -54,7 +54,7 @@ Cost driver: EventBridge events (two per cancellation) plus Lambda; still small 
 
 ### Option C - SQS FIFO (group = PNR) -> Lambda -> DynamoDB -> Streams -> settlement
 
-Summary: a FIFO queue with MessageGroupId = pnr keeps each PNR's events in order; the decider writes to
+Summary: a FIFO queue with MessageGroupId = pnr delivers each PNR's events in order at ingress; the decider writes to
 DynamoDB; a stream-triggered Lambda forwards each decision to the settlement queue.
 
 Services in order: producer -> SQS FIFO (+ DLQ) -> Lambda `decide` -> DynamoDB -> DynamoDB Streams ->
@@ -68,8 +68,11 @@ Lambda `publish` -> SQS `settlement-feed`
 | Streams -> Lambda `publish` | pull (event source mapping) | sync per batch | new image | stream read permissions | retries until success or the record expires; set bisect + on-failure destination SQS | read from the row |
 | Lambda -> SQS settlement | push | sync SendMessage | decision (no PII) | sqs:SendMessage on one queue | SDK retries, then exception -> stream retry | message attribute |
 
-Risks: (1) one poison message blocks every later event for that PNR until it reaches the DLQ. (2) More
-moving parts (two Lambdas, a stream) for a modest volume.
+Risks: (1) one poison message blocks every later event for that PNR until it reaches the DLQ, and once
+it is moved there, later events are processed without it, so exact order is lost. (2) Order is only
+guaranteed at ingress: DynamoDB Streams orders changes per item, not per PNR, so if one PNR's decisions
+land in different items the settlement feed can see them out of order (needs design, e.g. key by PNR or
+a sequence number). (3) More moving parts (two Lambdas, a stream) for a modest volume.
 
 Cost driver: two Lambda invocations per cancellation plus stream reads; FIFO requests cost slightly more
 than Standard. Throughput is far above 50/minute.
@@ -78,8 +81,8 @@ than Standard. Throughput is far above 50/minute.
 
 | | A: SQS Standard | B: EventBridge | C: SQS FIFO + Streams |
 |---|---|---|---|
-| Per-PNR ordering | no | no | yes |
-| Failure handling | partial batch + DLQ | async retries + destination | partial batch + DLQ, ordered |
+| Per-PNR ordering | no | no | per-PNR order at ingress; end-to-end order needs additional design |
+| Failure handling | partial batch + DLQ | async retries + destination | partial batch + DLQ (a message moved to the DLQ leaves the order) |
 | Settlement visibility | query the table | event feed | event feed from the table |
 | Moving parts | 3 | 5 | 6 |
 | Relative cost | lowest | low | low-medium |

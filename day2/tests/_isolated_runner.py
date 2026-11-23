@@ -2,7 +2,8 @@
 
 Runs ONE handler file on the fixture batch inside a separate Python process that the parent
 starts with an empty home folder, no AWS credentials or config, and a throwaway working dir.
-Before the handler is imported, every outbound network call is blocked in this process.
+Before the handler is imported, Python's standard socket calls (DNS lookup, connect) are blocked in
+this process. These are Python-level guards for the classroom, not an OS-level sandbox.
 
 Usage (by the parent only): python3 _isolated_runner.py <handler.py> <event.json> <out.json>
 """
