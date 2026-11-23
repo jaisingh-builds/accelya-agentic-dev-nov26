@@ -6,7 +6,7 @@ You are a senior Python engineer on Accelya's airline settlement platform, writi
 - docs/LOGGING_CONTRACT.md and docs/logging-contract.json - the logging standard (mandatory)
 - day2/data/refund_rules.json - the business rules
 - The spec in the docstring of day2/src/cancellation/handler.py
-- One real input record (paste one Record from day2/data/cancellation_events.json here):
+- One synthetic fixture record (paste one Record from day2/data/cancellation_events.json - synthetic data only, never real customer data):
 <FILL: paste one record>
 
 ## EXAMPLES

@@ -7,6 +7,8 @@
   4. no PII (passenger name, email, fare amount) appears in any log line
   5. every message's correlation_id appears in the logs (traceability)
 
+The handler runs with AWS credentials removed (isolated local runner).
+
 Run from the repo root:   python3 day2/tests/run_and_check.py
 Optional:                 python3 day2/tests/run_and_check.py path/to/handler.py
 No AWS account needed.
@@ -24,7 +26,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "day2" / "scripts"))
 import check_logs  # noqa: E402
 
-os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
+# Isolated local runner: generated or peer code runs with NO usable AWS credentials,
+# so it cannot touch any account even if it tries to call AWS.
+for _k in ("AWS_PROFILE", "AWS_DEFAULT_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+    os.environ.pop(_k, None)
+os.environ.update(AWS_CONFIG_FILE=os.devnull, AWS_SHARED_CREDENTIALS_FILE=os.devnull,
+                  AWS_EC2_METADATA_DISABLED="true", AWS_DEFAULT_REGION="us-east-1")
 os.environ.setdefault("POWERTOOLS_SERVICE_NAME", "accelya-m2-cancellation")
 DATA = ROOT / "day2" / "data"
 HANDLER = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "day2" / "src" / "cancellation" / "handler.py"

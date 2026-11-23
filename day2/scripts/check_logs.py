@@ -6,8 +6,11 @@ Usage (from the repo root):
     aws logs tail $LG --since 1h --format short | python3 day2/scripts/check_logs.py -
     python3 day2/scripts/check_logs.py my.log --pii day2/data/cancellation_events.json
 
-Lambda platform lines (START, END, REPORT, INIT_START) and the timestamp prefix
-added by `aws logs tail --format short` are skipped automatically.
+One JSON object per APPLICATION log record. Lambda platform records (START, END,
+REPORT, INIT_START, ...) are skipped, and the timestamp prefix that
+`aws logs tail --format short` puts in front of each record is stripped first.
+Values are checked against per-key rules (type, pattern, enum, length), so a
+payload can't hide inside an allowed key such as "message" or "key".
 Exit code 0 = conformant, 1 = violations found.
 """
 import json
@@ -38,38 +41,58 @@ def load_pii(path):
     return values
 
 
+def _check_value(k, val, rule):
+    """Typed, bounded values: a payload can't hide inside an allowed key."""
+    t = rule.get("type")
+    if t == "bool":
+        return None if isinstance(val, bool) else f"'{k}' must be true/false"
+    if t in ("int", "number"):
+        ok = isinstance(val, int) if t == "int" else isinstance(val, (int, float))
+        if isinstance(val, bool) or not ok:
+            return f"'{k}' must be a {t}"
+        if "min" in rule and val < rule["min"] or "max" in rule and val > rule["max"]:
+            return f"'{k}' = {val} is out of range"
+        return None
+    if not isinstance(val, str):
+        return f"'{k}' must be a string"
+    if "enum" in rule and val not in rule["enum"]:
+        return f"'{k}' = '{val[:30]}' is not one of {rule['enum']}"
+    if "max" in rule and len(val) > rule["max"]:
+        return f"'{k}' is {len(val)} chars (max {rule['max']})"
+    if "pattern" in rule and not re.match(rule["pattern"], val):
+        return f"'{k}' = '{val[:40]}{'…' if len(val) > 40 else ''}' doesn't match its rule (payload or free text?)"
+    return None
+
+
 def check_line(obj, raw, pii_values=()):
-    """Return a list of violation strings for one parsed JSON log line."""
+    """Return a list of violation strings for one parsed JSON log record."""
     c = CONTRACT
     v = []
     allowed = set(c["required"]) | set(c["optional"])
     for k in c["required"]:
         if k not in obj or obj[k] in ("", None):
             v.append(f"missing required '{k}'")
-    for k in obj:
+    for k, val in obj.items():
         if k not in allowed:
             v.append(f"key '{k}' is not in the contract")
-    for k, val in obj.items():
+            continue
         if isinstance(val, (dict, list)):
             v.append(f"'{k}' holds an object/array (payload-shaped)")
-    lvl = obj.get("level")
-    if lvl is not None and lvl not in c["levels"]:
-        v.append(f"level '{lvl}' not one of {c['levels']}")
-    if lvl == "ERROR":
+            continue
+        if val is None:
+            continue
+        err = _check_value(k, val, c["value_rules"].get(k, {"max": 128}))
+        if err:
+            v.append(err)
+    if obj.get("level") == "ERROR":
         for k in c["error_requires"]:
             if k not in obj:
-                v.append(f"ERROR line without '{k}'")
-    if "message" in obj and isinstance(obj["message"], str) and not re.match(c["message_pattern"], obj["message"]):
-        v.append(f"message '{obj['message'][:40]}' is not a dotted event name")
-    if "boundary" in obj and isinstance(obj["boundary"], str) and not re.match(c["boundary_pattern"], obj["boundary"]):
-        v.append(f"boundary '{obj['boundary']}' is not source->target or internal")
-    if "ts" in obj and isinstance(obj["ts"], str) and not re.match(c["ts_pattern"], obj["ts"]):
-        v.append(f"ts '{obj['ts']}' is not ISO-8601 UTC ending in Z")
+                v.append(f"ERROR record without '{k}'")
     if len(raw.encode()) > c["max_line_bytes"]:
-        v.append(f"line is {len(raw.encode())} bytes (max {c['max_line_bytes']})")
+        v.append(f"record is {len(raw.encode())} bytes (max {c['max_line_bytes']})")
     for p in pii_values:
         if p in raw:
-            v.append("PII value leaked into the log line")
+            v.append("PII value leaked into the log record")
             break
     return v
 
@@ -87,7 +110,7 @@ def check_lines(lines, pii_values=()):
             if not isinstance(obj, dict):
                 raise ValueError
         except ValueError:
-            results.append((n, line, ["not a single JSON object"]))
+            results.append((n, line, ["not one JSON object per record (free text?)"]))
             continue
         viol = check_line(obj, line, pii_values)
         if viol:

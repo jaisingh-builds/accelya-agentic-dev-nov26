@@ -1,11 +1,13 @@
-# Logging contract v1.0
+# Logging contract v1.1
 
 Issued on Day 2. Every artefact from Day 2 onwards is reviewed against it, and it is a line item on every HITL review.
 Machine-readable version: `docs/logging-contract.json`. Checker: `python3 day2/scripts/check_logs.py`.
 
 ## 1. One shape
 
-Every application log line is **one JSON object on one line**, at most **2 KB**.
+Every **application log record** is **one JSON object**, at most **2 KB**. Lambda's own platform records
+(`START`, `END`, `REPORT`, `INIT_START`…) are not application records and are not checked. `aws logs tail --format short`
+prints a timestamp in front of each record; the checker strips it before parsing.
 
 ```json
 {"ts": "2026-11-24T05:12:09Z", "level": "INFO", "service": "accelya-m2-cancellation",
@@ -25,7 +27,11 @@ Every application log line is **one JSON object on one line**, at most **2 KB**.
 ## 2. Identifiers and counts only - never payloads
 
 Allowed extra keys are listed in `logging-contract.json` (`optional`). **Anything else is a violation**, so a payload can't leak in under a new name.
-Values must be scalars (string, number, boolean, null) - no objects or arrays.
+
+An allowed key isn't a free-for-all either. Every key has a **value rule** (`value_rules`: type, pattern, enum or max length):
+`message` must be a dotted event name of at most 64 chars, `decision` one of three values, `pnr` six characters, and so on.
+That stops a payload hiding inside an allowed key such as `message`. Objects and arrays are never allowed.
+`python3 day2/tests/test_checker.py` proves it with negative tests.
 
 Never log: the event or message body, file rows, passenger names, emails, phone numbers, card data, fare amounts, raw exception messages.
 
@@ -44,6 +50,13 @@ Never log: the event or message body, file rows, passenger names, emails, phone 
 2. **Cost.** CloudWatch charges per GB ingested. Logging the payload multiplies log volume by the payload size, for every message.
 3. **Truncation and loss.** A CloudWatch log event is capped at 1 MB. Big lines get cut or rejected exactly when you need them.
 
-## 5. Changing the contract
+## 5. Lambda platform logs and Powertools (Day 4)
+
+- Platform records (`START`/`END`/`REPORT`) are written by Lambda, not by you. The contract covers only what your code writes.
+- From Day 4 we use **Lambda Powertools Logger**. Out of the box it writes `timestamp` (not `ts`) and adds keys such as
+  `location`. On Day 4 we configure it (a small custom formatter) to emit exactly this contract's shape, and the checker is how
+  you'll prove it. Until then, write records with `json.dumps(dict)`.
+
+## 6. Changing the contract
 
 Need a new key? Open a pull request that edits `logging-contract.json`, bumps `version`, and says why. Don't just log it.
