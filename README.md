@@ -43,9 +43,13 @@ aws configure --profile accelya-ai                           # + aws configure s
 python3 day1/scripts/arch_options.py --learner $L --profile accelya-ai --options 3 \
     --prompt day2/prompts/m2-arch-variants.md --out-dir day2/outputs
 
-# Labs 2-3 run locally, with AWS credentials removed by the harness
+# Lab 1 fallback (Bedrock failed or gave < 3 options): score day2/samples/m2-arch-variants-sample.md
+
+# Labs 2-3 run locally. The weak demo uses a stub AWS client; the harness runs each handler in a
+# separate process with an empty HOME, no AWS credentials and network calls blocked.
 python3 day2/demo/weak_cancellation.py
 python3 day2/tests/run_and_check.py                          # build day2/src/cancellation/handler.py until 6/6
+python3 day2/tests/run_and_check.py -v                       # same, plus every non-conformant log record
 python3 day2/tests/test_checker.py                           # proves the log checker catches hidden payloads
 ```
 

@@ -23,6 +23,10 @@ CASES = [
     ("object value", {**GOOD, "event_id": {"a": 1}}, False),
     ("ERROR without error_type", {**GOOD, "level": "ERROR"}, False),
     ("bool as string", {**GOOD, "cold_start": "true"}, False),
+    ("ERROR with error_type null", {**GOOD, "level": "ERROR", "error_type": None}, False),
+    ("ERROR with error_type ''", {**GOOD, "level": "ERROR", "error_type": ""}, False),
+    ("ERROR with error_type", {**GOOD, "level": "ERROR", "error_type": "InvalidCancellation"}, True),
+    ("null optional value", {**GOOD, "pnr": None}, False),
 ]
 fails = 0
 for name, obj, should_pass in CASES:

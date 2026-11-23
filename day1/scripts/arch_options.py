@@ -68,7 +68,7 @@ def main():
         except Exception:
             continue
     if session is None:
-        sys.exit("No usable profile. Run: aws configure --profile accelya  (current sandbox keys, us-east-1)")
+        sys.exit("No usable profile. Run: aws configure --profile accelya-ai  (AI sandbox keys, us-east-1; add the session token if shown)")
     print(f"profile={args.profile}")
     client = session.client("bedrock-runtime", region_name=REGION)
     try:

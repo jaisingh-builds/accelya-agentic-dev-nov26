@@ -42,7 +42,7 @@ Never log: the event or message body, file rows, passenger names, emails, phone 
 | `DEBUG` | Local diagnosis only. Off in deployed functions |
 | `INFO` | Boundary crossings and outcomes: received, decided, completed |
 | `WARNING` | Recoverable degradation: retried, defaulted, sent to manual review |
-| `ERROR` | The failure path. **Must include `error_type`** (exception class or classification) |
+| `ERROR` | The failure path. **Must include a non-empty `error_type`** (exception class or classification) |
 
 ## 4. Why no payloads
 
@@ -60,3 +60,5 @@ Never log: the event or message body, file rows, passenger names, emails, phone 
 ## 6. Changing the contract
 
 Need a new key? Open a pull request that edits `logging-contract.json`, bumps `version`, and says why. Don't just log it.
+
+> **No nulls.** If a key has no value, leave it out. `"error_type": null` or `"pnr": null` is non-conformant.

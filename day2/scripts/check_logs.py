@@ -80,14 +80,15 @@ def check_line(obj, raw, pii_values=()):
             v.append(f"'{k}' holds an object/array (payload-shaped)")
             continue
         if val is None:
+            v.append(f"'{k}' is null (omit the key instead)")
             continue
         err = _check_value(k, val, c["value_rules"].get(k, {"max": 128}))
         if err:
             v.append(err)
     if obj.get("level") == "ERROR":
         for k in c["error_requires"]:
-            if k not in obj:
-                v.append(f"ERROR record without '{k}'")
+            if not isinstance(obj.get(k), str) or not obj.get(k).strip():
+                v.append(f"ERROR record without a non-empty '{k}'")
     if len(raw.encode()) > c["max_line_bytes"]:
         v.append(f"record is {len(raw.encode())} bytes (max {c['max_line_bytes']})")
     for p in pii_values:
