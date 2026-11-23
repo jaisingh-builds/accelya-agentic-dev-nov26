@@ -55,10 +55,16 @@ def main():
         sys.exit(f"Edit {args.prompt} first - replace every <FILL ...> marker.")
 
     print(f"region={REGION} model={MODEL_ID} learner={args.learner}\n")
-    try:
-        session = boto3.Session(profile_name=args.profile)
-    except Exception:
-        sys.exit(f"Profile '{args.profile}' not found. Run: aws configure --profile {args.profile}  (AI sandbox keys, us-east-1)")
+    session = None
+    for prof in dict.fromkeys([args.profile, "accelya"]):
+        try:
+            session = boto3.Session(profile_name=prof)
+            args.profile = prof
+            break
+        except Exception:
+            continue
+    if session is None:
+        sys.exit("No usable profile. Run: aws configure --profile accelya  (current sandbox keys, us-east-1)")
     print(f"profile={args.profile}")
     client = session.client("bedrock-runtime", region_name=REGION)
     try:
