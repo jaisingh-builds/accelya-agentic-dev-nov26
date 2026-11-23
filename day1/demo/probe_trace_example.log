@@ -1,0 +1,12 @@
+# Saved allow -> deny -> allow trace (fallback for learners whose sandbox blocks iam:CreateRole).
+# Diagnose it against the Lab 3 checkpoint: which policy denied run2, and what changed for run3?
+{"level": "INFO", "correlation_id": "m1-3f9a1c2e-a1b2c3", "message": "file.received", "key": "raw/run1/ticket_issue_EK_2026-11-23.csv", "record_count": 12}
+{"level": "INFO", "correlation_id": "m1-3f9a1c2e-a1b2c3", "message": "probe.assume_role.ok", "boundary": "lambda->sts"}
+{"level": "INFO", "correlation_id": "m1-3f9a1c2e-a1b2c3", "message": "probe.list.ok", "boundary": "lambda->s3(reader)", "prefix": "validated/", "key_count": 0}
+{"level": "WARNING", "correlation_id": "m1-3f9a1c2e-a1b2c3", "message": "probe.list.denied", "boundary": "lambda->s3(reader)", "prefix": "raw/", "error_code": "AccessDenied"}
+# --- redeploy: TrustMode=locked ---
+{"level": "INFO", "correlation_id": "m1-7c41d0aa-d4e5f6", "message": "file.received", "key": "raw/run2/ticket_issue_EK_2026-11-23.csv", "record_count": 12}
+{"level": "ERROR", "correlation_id": "m1-7c41d0aa-d4e5f6", "message": "probe.assume_role.denied", "boundary": "lambda->sts", "error_code": "AccessDenied", "error": "User: arn:aws:sts::111122223333:assumed-role/accelya-m1-demo-ingest-role/accelya-m1-demo-ingest is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::111122223333:role/accelya-m1-demo-reader-role", "external_id_sent": false}
+# --- redeploy: TrustMode=locked ProbeExternalId=accelya-m1-partner ---
+{"level": "INFO", "correlation_id": "m1-91be22f0-0a1b2c", "message": "file.received", "key": "raw/run3/ticket_issue_EK_2026-11-23.csv", "record_count": 12}
+{"level": "INFO", "correlation_id": "m1-91be22f0-0a1b2c", "message": "probe.assume_role.ok", "boundary": "lambda->sts"}

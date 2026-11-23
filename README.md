@@ -6,7 +6,8 @@ Region `us-east-1` (Pluralsight sandbox). Synthetic airline data only - no real 
 ## Day 1 in one screen
 
 ```bash
-aws configure --profile accelya                 # Pluralsight keys, region us-east-1
+aws configure --profile accelya-ai              # AWS AI cloud sandbox (Bedrock) - Lab 1
+aws configure --profile accelya                 # standard AWS sandbox - Labs 2-3
 git clone https://github.com/jaisingh-builds/accelya-agentic-dev-nov26.git
 cd accelya-agentic-dev-nov26
 source day1/scripts/env.sh <your-id>          # sets L, F, B, LG
@@ -14,7 +15,7 @@ git checkout -b day1-$L
 bash day1/scripts/verify_setup.sh              # all PASS before Lab 1
 
 # Lab 1 - prompt -> two architectures (Bedrock)
-python3 day1/scripts/arch_options.py --learner $L
+python3 day1/scripts/arch_options.py --learner $L      # uses profile accelya-ai
 
 # Lab 2 - change the handler, test, then deploy S3 -> Lambda -> CloudWatch
 python3 day1/tests/test_ingest.py              # 4 PASS before you deploy

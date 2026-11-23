@@ -19,11 +19,13 @@ command -v sam >/dev/null && pass "sam cli $(sam --version | awk '{print $NF}')"
 REGION=$(aws configure get region 2>/dev/null || true); REGION=${AWS_DEFAULT_REGION:-$REGION}
 case "$REGION" in us-east-1|us-west-2) pass "region $REGION";; *) fail "region is '${REGION:-unset}'" "source day1/scripts/env.sh <id>  (sets us-east-1)";; esac
 
-ID=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)
-[ -n "$ID" ] && pass "signed in as $ID" || fail "AWS credentials" "paste the Pluralsight sandbox keys (aws configure)"
+AI=$(aws sts get-caller-identity --profile accelya-ai --query Arn --output text 2>/dev/null)
+[ -n "$AI" ] && pass "AI sandbox profile accelya-ai: $AI" || fail "profile accelya-ai (Lab 1)" "aws configure --profile accelya-ai  (AWS AI cloud sandbox keys)"
+ID=$(aws sts get-caller-identity --profile accelya --query Arn --output text 2>/dev/null)
+[ -n "$ID" ] && pass "standard sandbox profile accelya: $ID" || echo "  INFO  profile accelya (standard sandbox) not set yet - needed from Lab 2"
 
-if aws iam get-role --role-name accelya-nonexistent-probe >/dev/null 2>&1; then :; else
-  ERR=$(aws iam get-role --role-name accelya-nonexistent-probe 2>&1)
+if [ -z "$ID" ]; then :; elif aws iam get-role --profile accelya --role-name accelya-nonexistent-probe >/dev/null 2>&1; then :; else
+  ERR=$(aws iam get-role --profile accelya --role-name accelya-nonexistent-probe 2>&1)
   echo "$ERR" | grep -q NoSuchEntity && pass "iam:GetRole allowed (IAM readable)" \
     || echo "  INFO  IAM read is restricted in this sandbox - tell the trainer (fallback mode may be needed)"
 fi

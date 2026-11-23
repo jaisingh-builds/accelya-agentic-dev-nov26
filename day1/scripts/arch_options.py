@@ -42,6 +42,8 @@ def main():
     ap.add_argument("--learner", required=True)
     ap.add_argument("--prompt", default=str(DAY1 / "prompts" / "m1-arch-options.md"))
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--profile", default=os.getenv("BEDROCK_PROFILE", "accelya-ai"),
+                    help="AWS profile of the Pluralsight AWS *AI* cloud sandbox (Bedrock lives there)")
     args = ap.parse_args()
 
     calls = int(COUNTER.read_text()) if COUNTER.exists() else 0
@@ -53,7 +55,12 @@ def main():
         sys.exit(f"Edit {args.prompt} first - replace every <FILL ...> marker.")
 
     print(f"region={REGION} model={MODEL_ID} learner={args.learner}\n")
-    client = boto3.client("bedrock-runtime", region_name=REGION)
+    try:
+        session = boto3.Session(profile_name=args.profile)
+    except Exception:
+        sys.exit(f"Profile '{args.profile}' not found. Run: aws configure --profile {args.profile}  (AI sandbox keys, us-east-1)")
+    print(f"profile={args.profile}")
+    client = session.client("bedrock-runtime", region_name=REGION)
     try:
         resp = client.converse(
             modelId=MODEL_ID,

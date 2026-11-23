@@ -12,7 +12,11 @@ export AWS_DEFAULT_REGION="${ACCELYA_REGION:-us-east-1}"     # Pluralsight sandb
 export F="--resolve-s3 --capabilities CAPABILITY_NAMED_IAM --region $AWS_DEFAULT_REGION"
 export BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.anthropic.claude-3-5-sonnet-20241022-v2:0}"
 ACCT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
-if [ -z "$ACCT" ]; then echo "AWS credentials not working - run: aws configure --profile accelya"; return 1 2>/dev/null || exit 1; fi
+if [ -z "$ACCT" ]; then
+  echo "NOTE: standard-sandbox profile 'accelya' not working yet. Fine for Lab 1 (uses accelya-ai)."
+  echo "      Before Lab 2: open the standard AWS sandbox, aws configure --profile accelya, then source this again."
+  ACCT="<acct>"
+fi
 export B="accelya-m1-${L}-${ACCT}"
 export LG="/aws/lambda/accelya-m1-${L}-ingest"
 echo "profile=${AWS_PROFILE:-default}  region=$AWS_DEFAULT_REGION  L=$L"
