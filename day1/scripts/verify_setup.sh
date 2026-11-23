@@ -14,7 +14,8 @@ if [ -n "$PY" ] && $PY -c 'import sys; sys.exit(0 if sys.version_info >= (3,11) 
 $PY -c 'import boto3' 2>/dev/null && pass "boto3 $($PY -c 'import boto3;print(boto3.__version__)')" \
   || fail "boto3" "python3 -m pip install -U boto3"
 command -v aws >/dev/null && pass "aws cli $(aws --version 2>&1 | awk '{print $1}')" || fail "aws cli v2" "install AWS CLI v2"
-command -v sam >/dev/null && pass "sam cli $(sam --version | awk '{print $NF}')" || fail "sam cli" "install AWS SAM CLI"
+SAM=$(command -v sam || command -v sam.cmd)   # Git Bash on Windows only finds sam.cmd
+[ -n "$SAM" ] && pass "sam cli $("$SAM" --version | awk '{print $NF}')" || fail "sam cli" "install AWS SAM CLI"
 
 REGION=$(aws configure get region 2>/dev/null || true); REGION=${AWS_DEFAULT_REGION:-$REGION}
 case "$REGION" in us-east-1|us-west-2) pass "region $REGION";; *) fail "region is '${REGION:-unset}'" "source day1/scripts/env.sh <id>  (sets us-east-1)";; esac
