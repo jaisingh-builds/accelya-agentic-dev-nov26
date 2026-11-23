@@ -1,0 +1,7 @@
+dimension,what a 3 looks like,option_A,option_B,option_C,evidence (one line per option)
+correctness,meets the volume + ordering + decision-visibility requirements,,,,
+security,no public endpoints; IAM scoped per hop; no PII in logs,,,,
+observability,correlation_id survives every hop; follows the logging contract,,,,
+scalability,handles the disruption peak; retries + DLQ are designed in,,,,
+cost,cheapest option that meets the requirements at this volume,,,,
+TOTAL (/15),,,,,

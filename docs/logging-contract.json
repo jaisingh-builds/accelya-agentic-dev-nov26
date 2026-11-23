@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "issued": "Day 2 (Module 2)",
+  "required": ["ts", "level", "service", "correlation_id", "boundary", "message"],
+  "levels": ["DEBUG", "INFO", "WARNING", "ERROR"],
+  "optional": [
+    "learner_id", "contract_version",
+    "event_id", "event_type", "message_id", "pnr", "ticket_number", "airline_code", "fare_class",
+    "refund_rule_id", "decision", "attempt",
+    "bucket", "key", "bytes", "record_count", "duration_ms", "cold_start", "memory_limit_mb",
+    "error_type", "error_code"
+  ],
+  "error_requires": ["error_type"],
+  "message_pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)+$",
+  "boundary_pattern": "^(internal|[a-z0-9_]+(\\([a-z0-9_]+\\))?->[a-z0-9_]+(\\([a-z0-9_]+\\))?)$",
+  "ts_pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+  "max_line_bytes": 2048,
+  "forbidden_value_types": ["object", "array"],
+  "notes": "Change this file only by pull request. Adding a key is a contract change and needs a version bump."
+}

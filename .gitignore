@@ -9,3 +9,4 @@ day1/outputs/.bedrock_calls
 samconfig.toml
 .venv/
 venv/
+**/outputs/.bedrock_calls

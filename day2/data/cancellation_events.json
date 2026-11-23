@@ -1,0 +1,169 @@
+{
+  "Records": [
+    {
+      "messageId": "m-01",
+      "receiptHandle": "rh-m-01",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1001\", \"event_type\": \"cancellation\", \"pnr\": \"QX7P2L\", \"ticket_number\": \"098-2304511901\", \"airline_code\": \"AI\", \"fare_class\": \"Y\", \"od_pair\": \"BOM-DEL\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"scheduled\", \"no_show_flag\": false, \"fare_amount\": \"8450.00\", \"currency\": \"INR\", \"passenger_name\": \"Ananya Rao\", \"contact_email\": \"ananya.rao@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a001",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-02",
+      "receiptHandle": "rh-m-02",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1002\", \"event_type\": \"cancellation\", \"pnr\": \"LM4K8D\", \"ticket_number\": \"098-2304511902\", \"airline_code\": \"AI\", \"fare_class\": \"K\", \"od_pair\": \"DEL-BOM\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"scheduled\", \"no_show_flag\": false, \"fare_amount\": \"4120.00\", \"currency\": \"INR\", \"passenger_name\": \"Rohan Mehta\", \"contact_email\": \"rohan.m@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a002",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-03",
+      "receiptHandle": "rh-m-03",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1003\", \"event_type\": \"cancellation\", \"pnr\": \"ZT9W3E\", \"ticket_number\": \"125-7712003303\", \"airline_code\": \"BA\", \"fare_class\": \"L\", \"od_pair\": \"BOM-LHR\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"scheduled\", \"no_show_flag\": true, \"fare_amount\": \"52310.00\", \"currency\": \"INR\", \"passenger_name\": \"Sara Thomas\", \"contact_email\": \"sara.t@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a003",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-04",
+      "receiptHandle": "rh-m-04",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1004\", \"event_type\": \"cancellation\", \"pnr\": \"HB2N6R\", \"ticket_number\": \"176-4401289004\", \"airline_code\": \"EK\", \"fare_class\": \"J\", \"od_pair\": \"DEL-DXB\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"scheduled\", \"no_show_flag\": false, \"fare_amount\": \"68990.50\", \"currency\": \"INR\", \"passenger_name\": \"Vikram Iyer\", \"contact_email\": \"vikram.iyer@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a004",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-05",
+      "receiptHandle": "rh-m-05",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1005\", \"event_type\": \"cancellation\", \"pnr\": \"PC5V1Y\", \"ticket_number\": \"098-2304511905\", \"airline_code\": \"AI\", \"fare_class\": \"M\", \"od_pair\": \"BOM-SIN\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"departed\", \"no_show_flag\": false, \"fare_amount\": \"23175.00\", \"currency\": \"INR\", \"passenger_name\": \"Meera Shah\", \"contact_email\": \"meera.shah@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a005",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-06",
+      "receiptHandle": "rh-m-06",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1006\", \"event_type\": \"cancellation\", \"pnr\": \"GK8R4T\", \"ticket_number\": \"125-7712003306\", \"airline_code\": \"BA\", \"fare_class\": \"Z\", \"od_pair\": \"DEL-JFK\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"scheduled\", \"no_show_flag\": false, \"fare_amount\": \"91200.00\", \"currency\": \"INR\", \"passenger_name\": \"Arjun Nair\", \"contact_email\": \"arjun.nair@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a006",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-07",
+      "receiptHandle": "rh-m-07",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1007\", \"pnr\": \"UY4H8K\", \"fare_class\": \"Y\", ",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a007",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-08",
+      "receiptHandle": "rh-m-08",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1008\", \"event_type\": \"cancellation\", \"pnr\": \"WD3J7M\", \"ticket_number\": \"176-4401289008\", \"airline_code\": \"EK\", \"od_pair\": \"BOM-DXB\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"scheduled\", \"no_show_flag\": false, \"fare_amount\": \"15800.00\", \"currency\": \"INR\", \"passenger_name\": \"Neha Gupta\", \"contact_email\": \"neha.g@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a008",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-09",
+      "receiptHandle": "rh-m-09",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1009\", \"event_type\": \"cancellation\", \"pnr\": \"RF6T2Q\", \"ticket_number\": \"098-2304511909\", \"airline_code\": \"AI\", \"fare_class\": \"Q\", \"od_pair\": \"DEL-BOM\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"scheduled\", \"no_show_flag\": false, \"fare_amount\": \"1234.10\", \"currency\": \"INR\", \"passenger_name\": \"Kabir Singh\", \"contact_email\": \"kabir.s@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {
+        "correlation_id": {
+          "stringValue": "c-91a009",
+          "dataType": "String"
+        }
+      }
+    },
+    {
+      "messageId": "m-10",
+      "receiptHandle": "rh-m-10",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:111122223333:accelya-m2-cancellations",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1795468200000"
+      },
+      "body": "{\"event_id\": \"evt-1010\", \"event_type\": \"cancellation\", \"pnr\": \"NS1X9B\", \"ticket_number\": \"098-2304511910\", \"airline_code\": \"AI\", \"fare_class\": \"B\", \"od_pair\": \"BOM-DEL\", \"journey_date\": \"2026-12-05\", \"departure_status\": \"scheduled\", \"no_show_flag\": false, \"fare_amount\": \"9999.99\", \"currency\": \"INR\", \"passenger_name\": \"Diya Kapoor\", \"contact_email\": \"diya.k@example.com\", \"cancellation_timestamp\": \"2026-11-24T04:10:00Z\"}",
+      "messageAttributes": {}
+    }
+  ]
+}

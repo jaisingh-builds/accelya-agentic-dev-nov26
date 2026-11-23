@@ -29,11 +29,11 @@ MAX_DAY1_CALLS = 3
 SYSTEM = (
     "You are a senior AWS architect for an airline settlement platform. "
     "Use airline vocabulary (PNR, ticket_number, fare_class, od_pair, settlement). "
-    "Return exactly TWO architecture options in Markdown. For each option give: "
+    "Return exactly {n} architecture options in Markdown. For each option give: "
     "1) a one-line summary, 2) the AWS services in order, 3) for EVERY hop between two services "
     "a table answering: push or pull | sync or async | payload shape | which IAM role | "
     "failure path | where the correlation_id lives, 4) two risks. "
-    "End with a 3-line comparison. No preamble. Max 600 words."
+    "End with a short comparison. No preamble. Max {words} words."
 )
 
 
@@ -42,11 +42,15 @@ def main():
     ap.add_argument("--learner", required=True)
     ap.add_argument("--prompt", default=str(DAY1 / "prompts" / "m1-arch-options.md"))
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--options", type=int, choices=(2, 3), default=2, help="how many architecture options")
+    ap.add_argument("--out-dir", default=None, help="where to save (default: day1/outputs)")
     ap.add_argument("--profile", default=os.getenv("BEDROCK_PROFILE", "accelya-ai"),
                     help="AWS profile of the Pluralsight AWS *AI* cloud sandbox (Bedrock lives there)")
     args = ap.parse_args()
 
-    calls = int(COUNTER.read_text()) if COUNTER.exists() else 0
+    out_dir = Path(args.out_dir).resolve() if args.out_dir else DAY1 / "outputs"
+    counter = out_dir / ".bedrock_calls"
+    calls = int(counter.read_text()) if counter.exists() else 0
     if calls >= MAX_DAY1_CALLS and not args.force:
         sys.exit(f"Budget guard: {calls} Bedrock calls already made today. Re-use your output, or pass --force.")
 
@@ -70,9 +74,10 @@ def main():
     try:
         resp = client.converse(
             modelId=MODEL_ID,
-            system=[{"text": SYSTEM}],
+            system=[{"text": SYSTEM.format(n="TWO" if args.options == 2 else "THREE",
+                                           words=600 if args.options == 2 else 850)}],
             messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 1200, "temperature": 0.3},
+            inferenceConfig={"maxTokens": 1200 if args.options == 2 else 1700, "temperature": 0.3},
         )
     except ClientError as e:
         code = e.response["Error"]["Code"]
@@ -83,14 +88,15 @@ def main():
         }
         sys.exit(f"Bedrock error {code}: {e.response['Error']['Message']}\nHint: {hints.get(code, 'show the trainer')}")
 
-    COUNTER.parent.mkdir(exist_ok=True)
-    COUNTER.write_text(str(calls + 1))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    counter.write_text(str(calls + 1))
 
     text = resp["output"]["message"]["content"][0]["text"]
     usage = resp["usage"]
-    out = DAY1 / "outputs" / f"m1-arch-options-{args.learner}.md"
+    stem = Path(args.prompt).stem.replace("-prompt", "")
+    out = out_dir / (f"m1-arch-options-{args.learner}.md" if args.out_dir is None else f"{stem}-{args.learner}.md")
     out.write_text(
-        f"# M1 architecture options - {args.learner}\n\n"
+        f"# Architecture options ({args.options}) - {args.learner}\n\n"
         f"_model: {MODEL_ID} | tokens in/out: {usage['inputTokens']}/{usage['outputTokens']}_\n\n"
         f"## Prompt\n\n{prompt}\n\n## Bedrock answer\n\n{text}\n"
     )
