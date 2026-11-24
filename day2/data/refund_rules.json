@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "fare_families": {
+    "FLEX": [
+      "Y",
+      "B",
+      "M"
+    ],
+    "SAVER": [
+      "K",
+      "L",
+      "Q",
+      "V"
+    ],
+    "BUSINESS": [
+      "J",
+      "C",
+      "D"
+    ]
+  },
+  "evaluation_order": "First match wins: R-NOSHOW, R-DEPARTED, then the fare family rule, else R-UNKNOWN.",
+  "rules": [
+    {
+      "id": "R-NOSHOW",
+      "when": "no_show_flag is true",
+      "decision": "REJECT",
+      "refund_pct": 0
+    },
+    {
+      "id": "R-DEPARTED",
+      "when": "departure_status == 'departed'",
+      "decision": "REJECT",
+      "refund_pct": 0
+    },
+    {
+      "id": "R-FLEX",
+      "when": "fare family FLEX",
+      "decision": "APPROVE",
+      "refund_pct": 100
+    },
+    {
+      "id": "R-BUSINESS",
+      "when": "fare family BUSINESS",
+      "decision": "APPROVE",
+      "refund_pct": 100
+    },
+    {
+      "id": "R-SAVER",
+      "when": "fare family SAVER",
+      "decision": "APPROVE",
+      "refund_pct": 75
+    },
+    {
+      "id": "R-UNKNOWN",
+      "when": "fare_class in no family",
+      "decision": "MANUAL_REVIEW",
+      "refund_pct": 0
+    }
+  ],
+  "money": "refund_amount = fare_amount * refund_pct / 100, Decimal, ROUND_HALF_UP to 2 dp, returned as a string"
+}

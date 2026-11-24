@@ -23,6 +23,9 @@
 | Cost           |       |                                                      |
 | **TOTAL**      | __/15 |                                                      |
 
+**Logging contract (from Day 2, mandatory):** `python3 day2/scripts/check_logs.py <log>` → CONFORMANT / __ violations
+*A non-conformant artefact scores at most 1 on Observability.*
+
 **Verdict:** PASS / REVISE
 
 ---

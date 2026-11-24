@@ -1,0 +1,60 @@
+{
+  "batchItemFailures": [
+    {
+      "itemIdentifier": "m-07"
+    },
+    {
+      "itemIdentifier": "m-08"
+    }
+  ],
+  "decisions": [
+    {
+      "event_id": "evt-1001",
+      "decision": "APPROVE",
+      "refund_rule_id": "R-FLEX",
+      "refund_amount": "8450.00"
+    },
+    {
+      "event_id": "evt-1002",
+      "decision": "APPROVE",
+      "refund_rule_id": "R-SAVER",
+      "refund_amount": "3090.00"
+    },
+    {
+      "event_id": "evt-1003",
+      "decision": "REJECT",
+      "refund_rule_id": "R-NOSHOW",
+      "refund_amount": "0.00"
+    },
+    {
+      "event_id": "evt-1004",
+      "decision": "APPROVE",
+      "refund_rule_id": "R-BUSINESS",
+      "refund_amount": "68990.50"
+    },
+    {
+      "event_id": "evt-1005",
+      "decision": "REJECT",
+      "refund_rule_id": "R-DEPARTED",
+      "refund_amount": "0.00"
+    },
+    {
+      "event_id": "evt-1006",
+      "decision": "MANUAL_REVIEW",
+      "refund_rule_id": "R-UNKNOWN",
+      "refund_amount": "0.00"
+    },
+    {
+      "event_id": "evt-1009",
+      "decision": "APPROVE",
+      "refund_rule_id": "R-SAVER",
+      "refund_amount": "925.58"
+    },
+    {
+      "event_id": "evt-1010",
+      "decision": "APPROVE",
+      "refund_rule_id": "R-FLEX",
+      "refund_amount": "9999.99"
+    }
+  ]
+}

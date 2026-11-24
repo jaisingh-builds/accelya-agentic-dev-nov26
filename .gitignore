@@ -8,3 +8,5 @@ day1/outputs/.bedrock_calls
 .DS_Store
 samconfig.toml
 .venv/
+venv/
+**/outputs/.bedrock_calls

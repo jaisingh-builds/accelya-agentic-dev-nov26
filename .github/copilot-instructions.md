@@ -18,9 +18,12 @@ Read this file before generating anything in this repository.
 - Every resource name starts `accelya-m<module>-<learner>-`.
 - IAM: named actions on ARN-scoped resources. Never `"Action": "*"` or `"Resource": "*"`.
 - No secrets, keys or account ids in code. Config comes from environment variables.
-- Every log line is ONE JSON object with `level`, `service`, `correlation_id`, `message`.
-- Never log file contents, full payloads, PNR lists or fare amounts - log identifiers and counts only.
-- Every error path is explicit: catch the specific exception, log it at ERROR with the boundary name.
+- Logging follows docs/LOGGING_CONTRACT.md (machine check: python3 day2/scripts/check_logs.py). Required keys on
+  every line: ts, level, service, correlation_id, boundary, message. Only keys listed in docs/logging-contract.json.
+- Never log payloads, file rows, passenger names, emails, fare amounts or raw exception messages - identifiers and counts only.
+- Every error path is explicit: catch the specific exception, log it at ERROR with boundary and error_type.
+- Money is Decimal with ROUND_HALF_UP, never float.
+- No speculative abstraction: plain functions unless there are two real implementations.
 
 ## Before you write code
 Answer the six service-boundary questions (`docs/service-boundary-6q.md`) for every hop you add.
