@@ -30,3 +30,9 @@ Answer the six service-boundary questions (`docs/service-boundary-6q.md`) for ev
 
 ## Review
 Nothing is merged without a human review using `docs/HITL_REVIEW_TEMPLATE.md`.
+
+## Use the models from below:
+us.anthropic.claude-sonnet-4-6
+us.anthropic.claude-sonnet-5
+us.anthropic.claude-opus-4-5-20251101-v1:0
+us.anthropic.claude-3-haiku-20240307-v1:0

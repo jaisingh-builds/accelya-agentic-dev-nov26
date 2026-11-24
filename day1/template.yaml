@@ -179,7 +179,67 @@ Resources:
                   - Name: prefix
                     Value: raw/
 
-  # ---------- Row counter: raw/*.csv -> EventBridge -> Lambda ----------
+  # ---------- Option A: raw/*.csv -> EventBridge -> SQS -> Lambda -> DynamoDB ----------
+  CountRowsDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'accelya-m1-${LearnerId}-count-rows-dlq'
+      MessageRetentionPeriod: 1209600        # 14 days to investigate
+      SqsManagedSseEnabled: true
+
+  CountRowsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'accelya-m1-${LearnerId}-count-rows'
+      VisibilityTimeout: 180                 # >= 6x the function timeout (30s)
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt CountRowsDLQ.Arn
+        maxReceiveCount: 3
+
+  CountRowsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref CountRowsQueue, !Ref CountRowsDLQ]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowOwnEventBridgeRule
+            Effect: Allow
+            Principal: { Service: events.amazonaws.com }
+            Action: sqs:SendMessage
+            Resource: [!GetAtt CountRowsQueue.Arn, !GetAtt CountRowsDLQ.Arn]
+            Condition:
+              ArnEquals: { 'aws:SourceArn': !GetAtt RawCsvRule.Arn }
+
+  RawCsvRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'accelya-m1-${LearnerId}-raw-csv'
+      EventPattern:
+        source: [aws.s3]
+        detail-type: [Object Created]
+        detail:
+          bucket: { name: [!Ref RawBucket] }
+          object: { key: [{ wildcard: 'raw/*.csv' }] }
+      Targets:
+        - Id: count-rows-queue
+          Arn: !GetAtt CountRowsQueue.Arn
+          DeadLetterConfig: { Arn: !GetAtt CountRowsDLQ.Arn }
+          RetryPolicy: { MaximumRetryAttempts: 24, MaximumEventAgeInSeconds: 3600 }
+
+  FileCountsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'accelya-m1-${LearnerId}-file-counts'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }          # <airline>#<file date>
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+      SSESpecification: { SSEEnabled: true }
+
   CountRowsRole:
     Type: AWS::IAM::Role
     Condition: CreateRoles
@@ -192,14 +252,22 @@ Resources:
             Principal: { Service: lambda.amazonaws.com }
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: read-raw-csv-and-write-own-logs
+        - PolicyName: count-rows-least-privilege
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Sid: ReadRawZoneOnly
                 Effect: Allow
-                Action: s3:GetObject
+                Action: [s3:GetObject, s3:GetObjectVersion]
                 Resource: !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}/raw/*'
+              - Sid: ConsumeOwnQueue
+                Effect: Allow
+                Action: [sqs:ReceiveMessage, sqs:DeleteMessage, sqs:GetQueueAttributes]
+                Resource: !GetAtt CountRowsQueue.Arn
+              - Sid: WriteResultRow
+                Effect: Allow
+                Action: dynamodb:PutItem
+                Resource: !GetAtt FileCountsTable.Arn
               - Sid: WriteOwnLogStream
                 Effect: Allow
                 Action: [logs:CreateLogStream, logs:PutLogEvents]
@@ -222,19 +290,13 @@ Resources:
       Environment:
         Variables:
           LEARNER_ID: !Ref LearnerId
+          TABLE_NAME: !Ref FileCountsTable
       Events:
-        RawCsv:
-          Type: CloudWatchEvent          # EventBridge rule
+        FromQueue:
+          Type: SQS
           Properties:
-            Pattern:
-              source: [aws.s3]
-              detail-type: [Object Created]
-              detail:
-                bucket:
-                  name: [!Ref RawBucket]
-                object:
-                  key:
-                    - wildcard: raw/*.csv
+            Queue: !GetAtt CountRowsQueue.Arn
+            BatchSize: 1
 
 Outputs:
   BucketName:
@@ -249,3 +311,9 @@ Outputs:
   ReaderRoleArn:
     Condition: CreateRoles
     Value: !GetAtt ReaderRole.Arn
+  CountsTableName:
+    Value: !Ref FileCountsTable
+  CountRowsQueueUrl:
+    Value: !Ref CountRowsQueue
+  CountRowsDlqUrl:
+    Value: !Ref CountRowsDLQ
