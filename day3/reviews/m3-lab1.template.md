@@ -7,8 +7,8 @@ Commands: day3/LABS.md (Lab 1). Write counts and identifiers only - never row va
 | Step | Correlation id | file.received count (grep by that id) | Expected |
 |---|---|---|---|
 | Land in raw/ | `<you>-d3-001` | | 1 |
-| Bucket root | `<you>-d3-002` | | 0 |
-| Replay the same event (duplicate delivery) | `<you>-d3-001` | | 2 |
+| Bucket root (filter read first: prefix `____`) | `<you>-d3-002` | | 0 |
+| Replay the event once (simulated duplicate delivery) | `<you>-d3-001` | | 2 in total |
 | Resend: new upload, same bytes | `<you>-d3-003` | | 1 |
 
 - ETag 1 (after landing): `____`    ETag 2 (after the resend): `____`    equal? `yes / no` - what does that tell you about this file?

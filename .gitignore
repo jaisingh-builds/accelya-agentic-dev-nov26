@@ -10,4 +10,4 @@ samconfig.toml
 .venv/
 venv/
 **/outputs/.bedrock_calls
-day3/outputs/zones/
+day3/outputs/zones*/
