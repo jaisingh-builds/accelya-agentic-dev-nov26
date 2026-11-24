@@ -2,7 +2,7 @@
 #     source day1/scripts/env.sh <your-id>
 # Sets: AWS_PROFILE (accelya, if you created it), AWS_DEFAULT_REGION (us-east-1),
 #       L (learner id), F (sam deploy flags), B (your bucket), LG (your Lambda log group),
-#       BEDROCK_MODEL_ID (default model for Lab 1)
+#       (no BEDROCK_MODEL_ID default: the scripts choose a current model)
 if [ -z "$1" ]; then echo "usage: source day1/scripts/env.sh <your-id>"; return 1 2>/dev/null || exit 1; fi
 if aws configure list-profiles 2>/dev/null | grep -qx accelya; then export AWS_PROFILE=accelya; fi
 export L="$1"
@@ -10,7 +10,8 @@ export AWS_DEFAULT_REGION="${ACCELYA_REGION:-us-east-1}"     # Pluralsight sandb
 # --resolve-s3: SAM creates/uses its own artifact bucket for the code package
 # CAPABILITY_NAMED_IAM: required because the template creates IAM roles with fixed names
 export F="--resolve-s3 --capabilities CAPABILITY_NAMED_IAM --region $AWS_DEFAULT_REGION"
-export BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.anthropic.claude-3-5-sonnet-20241022-v2:0}"
+# Bedrock model: arch_options.py / draft_brd.py pick the first available current Claude model.
+# Override only if the trainer tells you to: export BEDROCK_MODEL_ID=<inference profile id>
 ACCT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
 if [ -z "$ACCT" ]; then
   echo "NOTE: standard-sandbox profile 'accelya' not working yet. Fine for Lab 1 (uses accelya-ai)."

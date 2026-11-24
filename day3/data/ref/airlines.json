@@ -1,0 +1,4 @@
+{"_note": "Synthetic reference data for the course. ticket_prefix = the airline's 3-digit accounting code at the start of ticket_number.",
+ "AI": {"name": "Air India", "ticket_prefix": "098"},
+ "BA": {"name": "British Airways", "ticket_prefix": "125"},
+ "EK": {"name": "Emirates", "ticket_prefix": "176"}}

@@ -53,6 +53,31 @@ python3 day2/tests/run_and_check.py -v                       # same, plus every 
 python3 day2/tests/test_checker.py                           # proves the log checker catches hidden payloads
 ```
 
+## Day 3 in one screen
+
+```bash
+source .venv/bin/activate && source day1/scripts/env.sh <your-id>
+git checkout main && git pull && git checkout -b day3-$L
+
+# Lab 1 - raw zone + S3 trigger (STANDARD sandbox, profile accelya): redeploy the Day 1 stack
+(cd day1 && sam build && sam deploy --stack-name accelya-m1-$L $F --parameter-overrides LearnerId=$L)
+aws s3 cp day3/data/ticket_issue_AI_2026-11-25.csv s3://$B/raw/ --metadata correlation-id=$L-d3-001
+aws logs tail $LG --since 5m --format short | grep file.received
+bash day1/scripts/cleanup_day1.sh $L                          # before you switch sandboxes
+
+# Labs 2-3 - design the rules on paper, then as data, and classify (local, no AWS)
+cp day3/design/validation-rules.template.md day3/design/validation-rules-$L.md
+cp day3/rules/validation_rules.template.json day3/rules/validation_rules.json
+python3 day3/scripts/classify.py day3/data/ticket_issue_AI_2026-11-25.csv --check
+python3 day3/scripts/classify.py day3/data/ticket_issue_AI_2026-11-25.csv --zones day3/outputs/zones
+python3 day3/tests/test_classify.py                           # proves the classifier itself
+
+# Lab 4 - BRD with Bedrock (AI sandbox, profile accelya-ai), then HITL review and draft 2
+python3 day3/scripts/draft_brd.py --learner $L
+python3 day3/scripts/draft_brd.py --learner $L --draft 2      # after pasting revision notes under ## REVISION
+# Lab 4 fallback: review day3/samples/m3-brd-sample.md
+```
+
 All data in this repo is synthetic. Never paste real customer data into prompts, logs or reviews.
 
 ## Layout
@@ -64,7 +89,7 @@ All data in this repo is synthetic. Never paste real customer data into prompts,
 | `docs/HITL_REVIEW_TEMPLATE.md` | Human review checklist - required before merge |
 | `docs/LOGGING_CONTRACT.md` | The logging standard every artefact is reviewed against (from Day 2) |
 | `glossary/airline.md` | Airline vocabulary |
-| `day1/`, `day2/` | Per-module code, data, prompts, scripts, tests |
+| `day1/` … `day3/` | Per-module code, data, prompts, scripts, tests |
 | `slides/` | Day slides (pptx + pdf) |
 
 ## Rules of the road
