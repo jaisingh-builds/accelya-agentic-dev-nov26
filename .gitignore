@@ -7,3 +7,4 @@ __pycache__/
 day1/outputs/.bedrock_calls
 .DS_Store
 samconfig.toml
+.venv/

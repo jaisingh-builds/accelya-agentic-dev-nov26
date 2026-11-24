@@ -51,6 +51,35 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled                # landing zone is append-only: re-uploads keep the old version
+      LifecycleConfiguration:
+        Rules:
+          - Id: raw-expire-old-versions
+            Status: Enabled
+            Prefix: raw/
+            NoncurrentVersionExpiration: { NoncurrentDays: 30 }
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 7 }
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true     # feeds CountRowsFunction without clashing with the raw/ S3 trigger
+
+  RawBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref RawBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt RawBucket.Arn
+              - !Sub '${RawBucket.Arn}/*'
+            Condition:
+              Bool: { 'aws:SecureTransport': 'false' }
 
   # ---------- IAM: identity the Lambda runs as ----------
   IngestRole:
@@ -149,6 +178,63 @@ Resources:
                 Rules:
                   - Name: prefix
                     Value: raw/
+
+  # ---------- Row counter: raw/*.csv -> EventBridge -> Lambda ----------
+  CountRowsRole:
+    Type: AWS::IAM::Role
+    Condition: CreateRoles
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-count-rows-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: read-raw-csv-and-write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadRawZoneOnly
+                Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}/raw/*'
+              - Sid: WriteOwnLogStream
+                Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub '${CountRowsLogGroup.Arn}:*'
+
+  CountRowsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/accelya-m1-${LearnerId}-count-rows'
+      RetentionInDays: 7
+
+  CountRowsFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: CountRowsLogGroup
+    Properties:
+      FunctionName: !Sub 'accelya-m1-${LearnerId}-count-rows'
+      CodeUri: src/count_rows/
+      Handler: app.handler
+      Role: !If [CreateRoles, !GetAtt CountRowsRole.Arn, !Ref ExistingRoleArn]
+      Environment:
+        Variables:
+          LEARNER_ID: !Ref LearnerId
+      Events:
+        RawCsv:
+          Type: CloudWatchEvent          # EventBridge rule
+          Properties:
+            Pattern:
+              source: [aws.s3]
+              detail-type: [Object Created]
+              detail:
+                bucket:
+                  name: [!Ref RawBucket]
+                object:
+                  key:
+                    - wildcard: raw/*.csv
 
 Outputs:
   BucketName:
