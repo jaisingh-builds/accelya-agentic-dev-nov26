@@ -45,7 +45,7 @@ def main():
     ap.add_argument("--options", type=int, choices=(2, 3), default=2, help="how many architecture options")
     ap.add_argument("--out-dir", default=None, help="where to save (default: day1/outputs)")
     ap.add_argument("--profile", default=os.getenv("BEDROCK_PROFILE", "accelya-ai"),
-                    help="AWS profile of the Pluralsight AWS *AI* cloud sandbox (Bedrock lives there)")
+                    help="AWS profile to try first (default accelya-ai; 'auto' = first working of accelya-ai, accelya, default)")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir).resolve() if args.out_dir else DAY1 / "outputs"
@@ -59,17 +59,25 @@ def main():
         sys.exit(f"Edit {args.prompt} first - replace every <FILL ...> marker.")
 
     print(f"region={REGION} model={MODEL_ID} learner={args.learner}\n")
+    # Use the first profile whose credentials actually work: --profile, accelya-ai, accelya,
+    # then the default chain (AWS_PROFILE / env keys / [default]). --profile auto skips straight to the list.
     session = None
-    for prof in dict.fromkeys([args.profile, "accelya"]):
+    tried = []
+    first = [] if args.profile in ("", "auto") else [args.profile]
+    for prof in dict.fromkeys(first + ["accelya-ai", "accelya", None]):
+        name = prof or "default credentials"
         try:
-            session = boto3.Session(profile_name=prof)
-            args.profile = prof
-            break
-        except Exception:
+            cand = boto3.Session(profile_name=prof) if prof else boto3.Session()
+            ident = cand.client("sts", region_name=REGION).get_caller_identity()
+        except Exception as e:  # noqa: BLE001 - missing profile, expired token, no keys
+            tried.append(f"{name}: {type(e).__name__}")
             continue
+        session, args.profile = cand, name
+        print(f"profile={name} account=...{ident['Account'][-4:]}")
+        break
     if session is None:
-        sys.exit("No usable profile. Run: aws configure --profile accelya-ai  (AI sandbox keys, us-east-1; add the session token if shown)")
-    print(f"profile={args.profile}")
+        sys.exit("No working AWS credentials (" + "; ".join(tried) + ").\n"
+                 "Run: aws configure --profile accelya-ai  (AI sandbox keys, us-east-1; add the session token if shown)")
     client = session.client("bedrock-runtime", region_name=REGION)
     try:
         resp = client.converse(
