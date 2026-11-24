@@ -8,7 +8,8 @@
 - [ ] Every functional requirement has a testable acceptance criterion (a number, a file, a route)
 - [ ] Record-level routing is stated: validated / quarantine by reason / flagged / skipped duplicate
 - [ ] Whole-file rejection (header drift) is a requirement, not an afterthought
-- [ ] Reruns: re-processing a file gives the same result (dates relative to the file, duplicates handled)
+- [ ] The four repeats have requirements: duplicate delivery, same-content resend, duplicate ticket row, deliberate rerun after a rule fix
+- [ ] Reruns are reproducible: dates relative to the file; source, rules, reference data and code versions recorded
 - [ ] Audit: raw is kept unchanged; every output can be traced to its source file and line
 - [ ] Observability NFR names the logging contract (docs/LOGGING_CONTRACT.md): JSON, correlation_id, no payloads
 - [ ] No implementation choices (no service names, no code) - that's Day 4's design

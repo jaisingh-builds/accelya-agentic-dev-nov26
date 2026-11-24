@@ -99,7 +99,7 @@ def main():
                 continue
             sys.exit(("Skipped: " + "; ".join(skipped) + "\n" if skipped else "") +
                      f"Bedrock error {code}: {e.response['Error']['Message']}\n"
-                     "Hint: score the published sample instead: day3/samples/m3-brd-sample.md")
+                     "Hint: use the published drafts instead: day3/samples/m3-brd-sample-v1.md and -v2.md")
     if skipped:
         print("skipped (not available here): " + "; ".join(skipped))
     print(f"model={model_used}\n")

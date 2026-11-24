@@ -59,10 +59,11 @@ python3 day2/tests/test_checker.py                           # proves the log ch
 source .venv/bin/activate && source day1/scripts/env.sh <your-id>
 git checkout main && git pull && git checkout -b day3-$L
 
+# Every Day 3 command, in lab order: day3/LABS.md
 # Lab 1 - raw zone + S3 trigger (STANDARD sandbox, profile accelya): redeploy the Day 1 stack
+export AWS_PROFILE=accelya && aws sts get-caller-identity --query Account --output text   # the sandbox account?
 (cd day1 && sam build && sam deploy --stack-name accelya-m1-$L $F --parameter-overrides LearnerId=$L)
-aws s3 cp day3/data/ticket_issue_AI_2026-11-25.csv s3://$B/raw/ --metadata correlation-id=$L-d3-001
-aws logs tail $LG --since 5m --format short | grep file.received
+# land (d3-001), bucket root (d3-002), replay one event (duplicate), resend (d3-003): see day3/LABS.md
 bash day1/scripts/cleanup_day1.sh $L                          # before you switch sandboxes
 
 # Labs 2-3 - design the rules on paper, then as data, and classify (local, no AWS)
@@ -73,9 +74,9 @@ python3 day3/scripts/classify.py day3/data/ticket_issue_AI_2026-11-25.csv --zone
 python3 day3/tests/test_classify.py                           # proves the classifier itself
 
 # Lab 4 - BRD with Bedrock (AI sandbox, profile accelya-ai), then HITL review and draft 2
-python3 day3/scripts/draft_brd.py --learner $L
-python3 day3/scripts/draft_brd.py --learner $L --draft 2      # after pasting revision notes under ## REVISION
-# Lab 4 fallback: review day3/samples/m3-brd-sample.md
+python3 day3/scripts/draft_brd.py --learner $L --profile accelya-ai
+python3 day3/scripts/draft_brd.py --learner $L --profile accelya-ai --draft 2      # after pasting revision notes under ## REVISION
+# Lab 4 fallback: day3/samples/m3-brd-sample-v1.md and -v2.md (real rehearsal drafts)
 ```
 
 All data in this repo is synthetic. Never paste real customer data into prompts, logs or reviews.

@@ -233,6 +233,8 @@ def write_zones(path, zones, file_res, results, rules_path, cid):
         "business_date": d, "correlation_id": cid,
         "rules_file": str(Path(rules_path).relative_to(ROOT)) if Path(rules_path).resolve().is_relative_to(ROOT) else str(rules_path),
         "rules_sha256": hashlib.sha256(Path(rules_path).read_bytes()).hexdigest()[:16],
+        "ref_data_sha256": hashlib.sha256(b"".join(p.read_bytes() for p in sorted(REF_DIR.glob("*.json")))).hexdigest()[:16],
+        "classifier_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:16],
         "file_route": file_res["route"],
         "rows_in": len(rows),
         "validated": counts["validated"], "flagged": counts["flagged"], "duplicates": counts["duplicate"],
@@ -317,7 +319,8 @@ def main():
         print(f"\n  zones written under {args.zones}/  (correlation_id {cid})")
         for w in sorted(written):
             print(f"    {w}")
-        print(f"    manifest: balanced={manifest['balanced']}  rules_sha256={manifest['rules_sha256']}")
+        print(f"    manifest: balanced={manifest['balanced']}  rules={manifest['rules_sha256']}  "
+              f"ref_data={manifest['ref_data_sha256']}  classifier={manifest['classifier_sha256']}")
 
     if args.check:
         ok, total, bad = compare(args.file, file_res, results)

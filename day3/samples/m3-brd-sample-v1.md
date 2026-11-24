@@ -1,4 +1,4 @@
-> **Lab 4 fallback - real Bedrock output, unedited.** Draft 1 from the filled prompt (Claude Sonnet 4.5, rehearsal on 24 Nov 2026).
+> **Lab 4 fallback, draft 1 - real Bedrock output, unedited.** From the filled prompt (Claude Sonnet 4.5, rehearsal on 24 Nov 2026).
 > Review it with day3/reviews/m3-brd-review.template.md exactly as you would your own draft. Synthetic scenario.
 
 _model: us.anthropic.claude-sonnet-4-5-20250929-v1:0 | tokens in/out: 934/1768 | prompt: m3-brd-prompt.filled.md_

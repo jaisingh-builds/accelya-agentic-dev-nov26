@@ -1,21 +1,25 @@
-# M3 Lab 1 - raw zone ingest: evidence
+# M3 Lab 1 - raw zone, trigger, duplicate vs resend: evidence
 
-**Learner:** `<your-id>`   **Bucket:** `accelya-m1-<you>-<acct>`
+**Learner:** `<your-id>`   **Account (aws sts get-caller-identity):** `…last 4 digits`   **Bucket:** `accelya-m1-<you>-<acct>`
 
-## 1. Upload to raw/ (the trigger fires)
-- correlation_id you set: `<your-id>-d3-001`
-- Lambda log line (`file.received`): paste ONE line - keys and counts only
-- record_count reported: `__` (the file has 42 data rows)
+Commands: day3/LABS.md (Lab 1). Write counts and identifiers only - never row values.
 
-## 2. Upload to the bucket root (the filter at work)
-- Did the Lambda run? `yes / no` - why?
+| Step | Correlation id | file.received count (grep by that id) | Expected |
+|---|---|---|---|
+| Land in raw/ | `<you>-d3-001` | | 1 |
+| Bucket root | `<you>-d3-002` | | 0 |
+| Replay the same event (duplicate delivery) | `<you>-d3-001` | | 2 |
+| Resend: new upload, same bytes | `<you>-d3-003` | | 1 |
 
-## 3. Same file to raw/ again (a duplicate event)
-- ETag first upload: `____`   ETag second upload: `____`   same? `yes / no`
-- How many `file.received` lines now? `__`
-- What would a processor that writes to validated/ do with the second one, today? What must it do instead?
+- ETag 1 (after landing): `____`    ETag 2 (after the resend): `____`    equal? `yes / no` - what does that tell you about this file?
+- Paste ONE file.received line (keys and counts only):
 
-## 4. The zone layout you'd design
+## Duplicate delivery vs resend (one line each)
+- Duplicate delivery is …
+- A resend is …
+- How should Day 4's validator recognise each one, so nothing is settled twice?
+
+## The zone layout you'd design
 | Zone | Prefix | Who writes | Who reads | Kept for | Why it exists |
 |---|---|---|---|---|---|
 | raw | `raw/` | | | | |
