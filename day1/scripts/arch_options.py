@@ -21,7 +21,14 @@ except ImportError:
     sys.exit("boto3 missing. Fix: python3 -m pip install -U boto3")
 
 REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
-MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-sonnet-20241022-v2:0")
+# First model that this account can call wins. Override with BEDROCK_MODEL_ID=<inference profile id>.
+MODEL_IDS = [m for m in [os.getenv("BEDROCK_MODEL_ID")] if m] + [
+    "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "us.anthropic.claude-sonnet-4-6",
+    "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "us.anthropic.claude-3-haiku-20240307-v1:0",
+]
+MODEL_ID = MODEL_IDS[0]
 DAY1 = Path(__file__).resolve().parent.parent
 COUNTER = DAY1 / "outputs" / ".bedrock_calls"
 MAX_DAY1_CALLS = 3
@@ -33,7 +40,8 @@ SYSTEM = (
     "1) a one-line summary, 2) the AWS services in order, 3) for EVERY hop between two services "
     "a table answering: push or pull | sync or async | payload shape | which IAM role | "
     "failure path | where the correlation_id lives, 4) two risks. "
-    "End with a short comparison. No preamble. Max {words} words."
+    "Keep tables tight: one row per hop, at most 8 words per cell. "
+    "End with a short comparison table. No preamble. Max {words} words."
 )
 
 
@@ -58,13 +66,15 @@ def main():
     if "<FILL" in prompt:
         sys.exit(f"Edit {args.prompt} first - replace every <FILL ...> marker.")
 
-    print(f"region={REGION} model={MODEL_ID} learner={args.learner}\n")
-    # Use the first profile whose credentials actually work: --profile, accelya-ai, accelya,
-    # then the default chain (AWS_PROFILE / env keys / [default]). --profile auto skips straight to the list.
+    print(f"region={REGION} learner={args.learner}")
+    # Use the first sandbox profile whose credentials actually work: --profile, then accelya-ai, accelya.
+    # Default credentials are used ONLY when asked for explicitly (--profile default): on a laptop they
+    # are often a different (company or personal) account.
     session = None
     tried = []
     first = [] if args.profile in ("", "auto") else [args.profile]
-    for prof in dict.fromkeys(first + ["accelya-ai", "accelya", None]):
+    for prof in dict.fromkeys(first + ["accelya-ai", "accelya"]):
+        prof = None if prof == "default" else prof
         name = prof or "default credentials"
         try:
             cand = boto3.Session(profile_name=prof) if prof else boto3.Session()
@@ -79,27 +89,41 @@ def main():
         sys.exit("No working AWS credentials (" + "; ".join(tried) + ").\n"
                  "Run: aws configure --profile accelya-ai  (AI sandbox keys, us-east-1; add the session token if shown)")
     client = session.client("bedrock-runtime", region_name=REGION)
-    try:
+    resp, MODEL_ID, skipped = None, None, []
+    for model in MODEL_IDS:
+      try:
         resp = client.converse(
-            modelId=MODEL_ID,
+            modelId=model,
             system=[{"text": SYSTEM.format(n="TWO" if args.options == 2 else "THREE",
                                            words=600 if args.options == 2 else 850)}],
             messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 1200 if args.options == 2 else 1700, "temperature": 0.3},
+            inferenceConfig={"maxTokens": 2500 if args.options == 2 else 3500, "temperature": 0.3},
         )
-    except ClientError as e:
+        MODEL_ID = model
+        break
+      except ClientError as e:
         code = e.response["Error"]["Code"]
+        if code in ("ResourceNotFoundException", "ValidationException", "AccessDeniedException") and model != MODEL_IDS[-1]:
+            skipped.append(f"{model} ({code})")
+            continue
         hints = {
             "AccessDeniedException": "Model access not granted in this sandbox - tell the trainer.",
             "ValidationException": "Model id/profile not enabled here. List what is: aws bedrock list-inference-profiles --query \"inferenceProfileSummaries[].inferenceProfileId\" then export BEDROCK_MODEL_ID=<one of them>",
             "ThrottlingException": "Throttled - wait 30 s and retry once.",
         }
-        sys.exit(f"Bedrock error {code}: {e.response['Error']['Message']}\nHint: {hints.get(code, 'show the trainer')}")
+        sys.exit(("Skipped: " + "; ".join(skipped) + "\n" if skipped else "") +
+                 f"Bedrock error {code}: {e.response['Error']['Message']}\nHint: {hints.get(code, 'show the trainer')}")
+    if skipped:
+        print("skipped (not available here): " + "; ".join(skipped))
+    print(f"model={MODEL_ID}\n")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     counter.write_text(str(calls + 1))
 
     text = resp["output"]["message"]["content"][0]["text"]
+    if resp.get("stopReason") == "max_tokens":
+        text += "\n\n_[answer cut off at the token limit: score what is here and note it as a finding]_"
+        print("WARNING: the answer hit the token limit and is cut off.")
     usage = resp["usage"]
     stem = Path(args.prompt).stem.replace("-prompt", "")
     out = out_dir / (f"m1-arch-options-{args.learner}.md" if args.out_dir is None else f"{stem}-{args.learner}.md")
