@@ -1,5 +1,7 @@
 # M2 Option A (v2): SQS FIFO → Lambda → DynamoDB + SNS
 
+> **Superseded by `m2-arch-option-A-v3.md`.** v2 has known correctness bugs and AGENTS.md violations. Kept for history only.
+
 Revision of Option A to close the gaps found in `day2/reviews/HITL_REVIEW-m2-arch-variants.md`
 (Observability 2→3, Scalability 2→3, Cost 2→3). The hops and the six-question answers are unchanged
 except where marked **[v2]**.

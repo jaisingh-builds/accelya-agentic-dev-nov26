@@ -32,7 +32,20 @@
 
 **Verdict:** A — REVISE · B — REVISE · C — REVISE
 
-**A v2** (`day2/outputs/m2-arch-option-A-v2.md`, draft): Observability 3 (Powertools + EMF + classified errors), Scalability 2→3 only once the 10× test is **run** (planned, not yet run), Cost 3 (cost-per-record estimate and metric). Projected **13/15 PASS** if the 10× test passes; **12/15 PASS** on the current paper design (Scalability stays 2 until the test is run).
+**A v2** (`day2/outputs/m2-arch-option-A-v2.md`) — **retracted.** An earlier note here projected 12–13/15 PASS. A critical review found three correctness bugs (dedup on `ticket_number` drops legitimate events; SNS failure after the put loses the decision; DLQ breaks per-`pnr` order) and AGENTS.md misses (EMF keys outside the logging contract, raw exception logging, no resource names, missing hops). Do not rely on that score.
+
+**A v3** (`day2/outputs/m2-arch-option-A-v3.md`, AI draft, design only, needs human review):
+
+| Dim | Score | Evidence |
+|---|---|---|
+| Correctness | 2 | Idempotent on `(pnr, event_id)`, PENDING→PUBLISHED status, double-refund and out-of-order guards; two guards are new rules needing business sign-off; nothing tested |
+| Security | 3 | ARN-scoped named actions, queue policy with TLS deny, encryption on all stores, data minimisation (no names or emails) |
+| Observability | 2 | Contract-conformant `json.dumps` logs, classified errors, metric filters and alarms; no Powertools/EMF until Day 4 |
+| Scalability | 2 | Idempotent, bounded, `MaximumConcurrency` set; 10× and fault-injection tests planned, **not run** |
+| Cost | 2 | Workload-appropriate, cost per record estimated and measurable; no sampling discipline |
+| **TOTAL** | **11/15** | **REVISE** (pass bar is 12/15) |
+
+To reach PASS: run the 10× and fault-injection tests and record the result (Scalability 3, total 12/15). Also resolve the open decisions in section 11 of the v3 doc.
 
 ---
 
