@@ -8,13 +8,19 @@ FAILS=0
 echo "Accelya M1 - environment check"
 
 command -v git >/dev/null && pass "git $(git --version | awk '{print $3}')" || fail "git" "install Git"
-PY=$(command -v python3 || command -v python)
+# Windows: python3/python may be the Microsoft Store stub, so try each candidate until one actually runs
+PY=""
+for c in python3 python "py -3"; do
+  command -v ${c%% *} >/dev/null && $c -c 'import sys' >/dev/null 2>&1 && { PY=$c; break; }
+done
 if [ -n "$PY" ] && $PY -c 'import sys; sys.exit(0 if sys.version_info >= (3,11) else 1)'; then
-  pass "python $($PY -V 2>&1 | awk '{print $2}')"; else fail "python >= 3.11" "install Python 3.11+"; fi
-$PY -c 'import boto3' 2>/dev/null && pass "boto3 $($PY -c 'import boto3;print(boto3.__version__)')" \
-  || fail "boto3" "python3 -m pip install -U boto3"
+  pass "python $($PY -V 2>&1 | awk '{print $2}') ($PY)"; else fail "python >= 3.11" "install Python 3.11+"; fi
+[ -n "$PY" ] && $PY -c 'import boto3' 2>/dev/null && pass "boto3 $($PY -c 'import boto3;print(boto3.__version__)')" \
+  || fail "boto3" "${PY:-python3} -m pip install -U boto3"
 command -v aws >/dev/null && pass "aws cli $(aws --version 2>&1 | awk '{print $1}')" || fail "aws cli v2" "install AWS CLI v2"
-command -v sam >/dev/null && pass "sam cli $(sam --version | awk '{print $NF}')" || fail "sam cli" "install AWS SAM CLI"
+# Windows: SAM CLI installs as sam.cmd, which bash does not resolve as plain 'sam'
+SAM=$(command -v sam || command -v sam.cmd)
+[ -n "$SAM" ] && pass "sam cli $("$SAM" --version | awk '{print $NF}')" || fail "sam cli" "install AWS SAM CLI"
 
 REGION=$(aws configure get region 2>/dev/null || true); REGION=${AWS_DEFAULT_REGION:-$REGION}
 case "$REGION" in us-east-1|us-west-2) pass "region $REGION";; *) fail "region is '${REGION:-unset}'" "source day1/scripts/env.sh <id>  (sets us-east-1)";; esac

@@ -7,3 +7,9 @@ __pycache__/
 day1/outputs/.bedrock_calls
 .DS_Store
 samconfig.toml
+# IntelliJ / JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
