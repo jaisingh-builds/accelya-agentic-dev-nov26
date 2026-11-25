@@ -53,7 +53,7 @@ def main():
     ap.add_argument("--options", type=int, choices=(2, 3), default=2, help="how many architecture options")
     ap.add_argument("--out-dir", default=None, help="where to save (default: day1/outputs)")
     ap.add_argument("--profile", default=os.getenv("BEDROCK_PROFILE", "accelya-ai"),
-                    help="AWS profile to try first (default accelya-ai; 'auto' = first working of accelya-ai, accelya, default)")
+                    help="profile to try first (default accelya-ai; 'auto' = accelya-ai then accelya; 'default' = default credentials)")
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir).resolve() if args.out_dir else DAY1 / "outputs"
