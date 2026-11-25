@@ -21,7 +21,7 @@ except ImportError:
     sys.exit("boto3 missing. Fix: python3 -m pip install -U boto3")
 
 REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
-MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-sonnet-20241022-v2:0")
+MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
 DAY1 = Path(__file__).resolve().parent.parent
 COUNTER = DAY1 / "outputs" / ".bedrock_calls"
 MAX_DAY1_CALLS = 3
@@ -66,7 +66,7 @@ def main():
             modelId=MODEL_ID,
             system=[{"text": SYSTEM}],
             messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 1200, "temperature": 0.3},
+            inferenceConfig={"maxTokens": 22000, "temperature": 0.3},
         )
     except ClientError as e:
         code = e.response["Error"]["Code"]

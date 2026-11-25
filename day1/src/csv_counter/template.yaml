@@ -1,0 +1,229 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Accelya M1 csv-counter - self-contained stack: S3 landing bucket,
+  csv-counter Lambda, IAM execution role, CloudWatch log group, and
+  S3 ObjectCreated event wiring for raw/*.csv uploads.
+
+# Bucket layout (key prefixes):
+#   raw/       - agency drops ticket_issue_<airline>_<date>.csv unchanged.
+#                The csv-counter Lambda counts data rows here.
+#   validated/ - reserved for a future validator Lambda.
+#   curated/   - reserved for downstream settlement aggregation.
+#
+# Service-boundary answers (hop: S3 -> Lambda)
+#   1 Push      : S3 event notification invokes the csv-counter Lambda.
+#   2 Async     : S3 does not wait; Lambda retries async events twice on error.
+#   3 Payload   : S3 event JSON (Records[].s3.bucket.name, object.key, size).
+#   4 Role      : csv-counter-role needs s3:GetObject + s3:HeadObject on raw/*
+#                 only.  Agency-upload-role needs s3:PutObject on raw/* only.
+#   5 Failure   : Lambda async retry x2; no DLQ configured (add one for prod).
+#   6 Corr. ID  : x-amz-meta-correlation-id when the uploader sets one;
+#                 minted by the Lambda otherwise and written on every log line.
+
+Parameters:
+  LearnerId:
+    Type: String
+    Description: Your short learner id, lowercase (e.g. priya, rahul-k)
+    AllowedPattern: '^[a-z0-9-]{2,20}$'
+    ConstraintDescription: 2-20 chars, lowercase letters, digits, hyphen
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Architectures: [x86_64]
+
+Resources:
+
+  # ------------------------------------------------------------------ #
+  # S3: landing bucket with raw/ validated/ curated/ zones             #
+  # ------------------------------------------------------------------ #
+  CsvCounterBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'accelya-m1-${LearnerId}-${AWS::AccountId}'
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+      VersioningConfiguration:
+        Status: Enabled
+
+      LifecycleConfiguration:
+        Rules:
+          - Id: raw-tiering
+            Status: Enabled
+            Filter:
+              Prefix: raw/
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: INTELLIGENT_TIERING
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+          - Id: validated-tiering
+            Status: Enabled
+            Filter:
+              Prefix: validated/
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: INTELLIGENT_TIERING
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+          - Id: curated-expiry
+            Status: Enabled
+            Filter:
+              Prefix: curated/
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: INTELLIGENT_TIERING
+            ExpirationInDays: 180
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt CsvCounterFunction.Arn
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: raw/
+                  - Name: suffix
+                    Value: .csv
+
+  # ------------------------------------------------------------------ #
+  # IAM: agency upload role                                            #
+  # Grants s3:PutObject on raw/* only.  Trusts the learner's account;   #
+  # replace the principal with the agency's federated role in prod.     #
+  # ------------------------------------------------------------------ #
+  AgencyUploadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-csv-counter-agency-upload-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: put-raw-zone-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: PutRawZone
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub '${CsvCounterBucket.Arn}/raw/*'
+
+              - Sid: DenyOutsideRaw
+                Effect: Deny
+                Action: s3:PutObject
+                NotResource: !Sub '${CsvCounterBucket.Arn}/raw/*'
+
+  # ------------------------------------------------------------------ #
+  # IAM: csv-counter execution role                                    #
+  # Lambda service trust with confused-deputy guard.                   #
+  # ------------------------------------------------------------------ #
+  CsvCounterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-csv-counter-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:accelya-m1-${LearnerId}-csv-counter'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: read-raw-csv
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadRawZoneCsv
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:HeadObject
+                Resource: !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}/raw/*'
+
+  # ------------------------------------------------------------------ #
+  # CloudWatch log group with explicit retention                        #
+  # ------------------------------------------------------------------ #
+  CsvCounterLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/accelya-m1-${LearnerId}-csv-counter'
+      RetentionInDays: 7
+
+  # ------------------------------------------------------------------ #
+  # Lambda: counts data rows in each raw/*.csv upload                  #
+  # ------------------------------------------------------------------ #
+  CsvCounterFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: CsvCounterLogGroup
+    Properties:
+      FunctionName: !Sub 'accelya-m1-${LearnerId}-csv-counter'
+      CodeUri: ./
+      Handler: app.handler
+      Role: !GetAtt CsvCounterRole.Arn
+      Environment:
+        Variables:
+          LEARNER_ID: !Ref LearnerId
+
+  # ------------------------------------------------------------------ #
+  # Lambda permission: allow S3 to invoke the csv-counter function     #
+  # ------------------------------------------------------------------ #
+  CsvCounterFunctionRawUploadPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CsvCounterFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !GetAtt CsvCounterBucket.Arn
+      SourceAccount: !Ref AWS::AccountId
+
+Outputs:
+  BucketName:
+    Description: S3 landing bucket for raw/ uploads
+    Value: !Ref CsvCounterBucket
+
+  BucketArn:
+    Value: !GetAtt CsvCounterBucket.Arn
+
+  FunctionName:
+    Value: !Ref CsvCounterFunction
+
+  FunctionArn:
+    Value: !GetAtt CsvCounterFunction.Arn
+
+  LogGroup:
+    Value: !Ref CsvCounterLogGroup
+
+  CsvCounterRoleArn:
+    Value: !GetAtt CsvCounterRole.Arn
+
+  AgencyUploadRoleArn:
+    Description: Assume this role to upload ticket_issue CSV files to raw/
+    Value: !GetAtt AgencyUploadRole.Arn

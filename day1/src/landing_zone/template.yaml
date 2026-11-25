@@ -1,0 +1,230 @@
+AWSTemplateFormatVersion: '2010-09-09'
+# Bucket layout (key prefixes):
+#   raw/        - agency drops ticket_issue_<airline>_<date>.csv unchanged.
+#                 Never modified after landing (audit trail).
+#   validated/  - ingest Lambda writes records that pass schema checks.
+#   curated/    - downstream settlement jobs write aggregated fare data.
+#
+# Service-boundary answers (hop: Agency -> S3 raw/)
+#   1 Push      : Agency (or automated feed) performs s3:PutObject.
+#   2 Async     : S3 returns 200 to the uploader; Lambda is notified separately.
+#   3 Payload   : ticket_issue_<airline_code>_<YYYY-MM-DD>.csv with fields
+#                 pnr, ticket_number, airline_code, fare_class, od_pair,
+#                 issue_date, fare_amount, currency, agency_iata.
+#   4 Role      : agency-upload-role, s3:PutObject on raw/* only.
+#                 ingest Lambda role, s3:GetObject + s3:HeadObject on raw/* only.
+#                 validated-writer role (future), s3:PutObject on validated/* only.
+#   5 Failure   : S3 returns 4xx/5xx to the uploader; no retry on S3's side.
+#                 Versioning prevents silent overwrite on retry.
+#   6 Corr. ID  : uploaded as x-amz-meta-correlation-id object metadata;
+#                 the ingest Lambda reads and propagates it.
+Description: >
+  Accelya M1 - S3 landing zone. Single bucket with raw/, validated/,
+  and curated/ key-prefix zones. No public access, AES-256 at rest,
+  versioning enabled, lifecycle to Intelligent-Tiering after 30 days.
+
+Parameters:
+  LearnerId:
+    Type: String
+    Description: Your short learner id, lowercase (e.g. priya, rahul-k)
+    AllowedPattern: '^[a-z0-9-]{2,20}$'
+    ConstraintDescription: 2-20 chars, lowercase letters, digits, hyphen
+
+Resources:
+
+  # ------------------------------------------------------------------ #
+  # S3: single-bucket, three-zone landing area                          #
+  # ------------------------------------------------------------------ #
+  LandingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'accelya-m1-${LearnerId}-${AWS::AccountId}-landing'
+
+      # --- security baseline ---
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      # --- encryption at rest (AES-256, no extra cost) ---
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+      # --- versioning keeps every raw/ drop for audit ---
+      VersioningConfiguration:
+        Status: Enabled
+
+      # --- lifecycle: cost guard for sandbox ---
+      LifecycleConfiguration:
+        Rules:
+          # raw/ files: transition to Intelligent-Tiering after 30 days;
+          # expire non-current versions after 90 days.
+          - Id: raw-tiering
+            Status: Enabled
+            Prefix: raw/
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: INTELLIGENT_TIERING
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+          # validated/ files: same tiering; no long-term retention needed.
+          - Id: validated-tiering
+            Status: Enabled
+            Prefix: validated/
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: INTELLIGENT_TIERING
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+          # curated/ files: aggregate fare data, keep 180 days then expire.
+          - Id: curated-expiry
+            Status: Enabled
+            Prefix: curated/
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: INTELLIGENT_TIERING
+            ExpirationInDays: 180
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+  # ------------------------------------------------------------------ #
+  # IAM: agency upload role                                             #
+  # Grants s3:PutObject on raw/* only.  Trust is an AWS account        #
+  # principal; in production replace with the agency's federated role.  #
+  # ------------------------------------------------------------------ #
+  AgencyUploadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-agency-upload-role'
+      AssumeRolePolicyDocument:        # TRUST policy
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: put-raw-zone-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Allow upload to raw/ with mandatory correlation-id metadata.
+              - Sid: PutRawZone
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub '${LandingBucket.Arn}/raw/*'
+
+              # Deny upload anywhere outside raw/ — belt-and-suspenders.
+              - Sid: DenyOutsideRaw
+                Effect: Deny
+                Action: s3:PutObject
+                Resource:
+                  - !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}-landing'
+                  - !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}-landing/validated/*'
+                  - !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}-landing/curated/*'
+
+  # ------------------------------------------------------------------ #
+  # IAM: ingest reader role                                             #
+  # The ingest Lambda (defined in the M1 ingest stack) uses this to    #
+  # read raw/ objects after the S3 event fires.                         #
+  # ------------------------------------------------------------------ #
+  IngestReaderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-lz-ingest-reader-role'
+      AssumeRolePolicyDocument:        # TRUST policy
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: read-raw-zone-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Read raw files and their metadata (GetObject covers HEAD requests).
+              - Sid: GetRawZone
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub '${LandingBucket.Arn}/raw/*'
+
+  # ------------------------------------------------------------------ #
+  # IAM: validated writer role                                          #
+  # Placeholder for the validator Lambda (future module).               #
+  # ------------------------------------------------------------------ #
+  ValidatedWriterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-lz-validated-writer-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: write-validated-zone-only
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: PutValidatedZone
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub '${LandingBucket.Arn}/validated/*'
+              # Read raw/ to validate it.
+              - Sid: GetRawZone
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub '${LandingBucket.Arn}/raw/*'
+
+Outputs:
+  BucketName:
+    Description: Landing zone bucket (use this wherever the M1 ingest stack expects RawBucketName)
+    Value: !Ref LandingBucket
+    Export:
+      Name: !Sub 'accelya-m1-${LearnerId}-landing-bucket'
+
+  BucketArn:
+    Value: !GetAtt LandingBucket.Arn
+    Export:
+      Name: !Sub 'accelya-m1-${LearnerId}-landing-bucket-arn'
+
+  RawPrefix:
+    Description: S3 URI for the raw landing zone
+    Value: !Sub 's3://${LandingBucket}/raw/'
+
+  ValidatedPrefix:
+    Description: S3 URI for the validated zone
+    Value: !Sub 's3://${LandingBucket}/validated/'
+
+  CuratedPrefix:
+    Description: S3 URI for the curated zone
+    Value: !Sub 's3://${LandingBucket}/curated/'
+
+  AgencyUploadRoleArn:
+    Description: Assume this role to upload ticket_issue CSV files to raw/
+    Value: !GetAtt AgencyUploadRole.Arn
+
+  IngestReaderRoleArn:
+    Description: Assign to the ingest Lambda as its execution role
+    Value: !GetAtt IngestReaderRole.Arn
+
+  ValidatedWriterRoleArn:
+    Description: Assign to the validator Lambda (future module)
+    Value: !GetAtt ValidatedWriterRole.Arn
