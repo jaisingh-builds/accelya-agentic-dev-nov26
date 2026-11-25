@@ -11,3 +11,5 @@ samconfig.toml
 venv/
 **/outputs/.bedrock_calls
 day3/outputs/zones*/
+
+*.pptx

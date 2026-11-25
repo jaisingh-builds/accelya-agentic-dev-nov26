@@ -32,6 +32,8 @@
 
 **Verdict:** A — REVISE · B — REVISE · C — REVISE
 
+**A v2** (`day2/outputs/m2-arch-option-A-v2.md`, draft): Observability 3 (Powertools + EMF + classified errors), Scalability 2→3 only once the 10× test is **run** (planned, not yet run), Cost 3 (cost-per-record estimate and metric). Projected **13/15 PASS** if the 10× test passes; **12/15 PASS** on the current paper design (Scalability stays 2 until the test is run).
+
 ---
 
 ## Per-dimension detail
