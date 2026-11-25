@@ -7,8 +7,10 @@ export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
 ACCT=$(aws sts get-caller-identity --query Account --output text)
 BUCKET="accelya-m1-${L}-${ACCT}"
 
-echo "Emptying s3://${BUCKET} ..."
-aws s3 rm "s3://${BUCKET}" --recursive || true
+for B in "$BUCKET" "accelya-m1-${L}-landing-${ACCT}"; do
+  echo "Emptying s3://${B} ..."
+  aws s3 rm "s3://${B}" --recursive || true
+done
 
 for STACK in "accelya-m1-${L}" "accelya-m1-${L}-dup"; do
   if aws cloudformation describe-stacks --stack-name "$STACK" >/dev/null 2>&1; then

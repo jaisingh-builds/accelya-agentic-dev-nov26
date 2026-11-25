@@ -52,6 +52,49 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  # ---------- S3: landing zone (partner drop point, before raw/) ----------
+  LandingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'accelya-m1-${LearnerId}-landing-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-unprocessed-landing-files
+            Status: Enabled
+            ExpirationInDays: 7
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+  # Deny any non-TLS access to the landing zone.
+  LandingBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref LandingBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'        # deny-only statement: applies to every caller
+            Action: 's3:*'
+            Resource:
+              - !GetAtt LandingBucket.Arn
+              - !Sub '${LandingBucket.Arn}/*'
+            Condition:
+              Bool: { 'aws:SecureTransport': 'false' }
+
   # ---------- IAM: identity the Lambda runs as ----------
   IngestRole:
     Type: AWS::IAM::Role
@@ -153,6 +196,8 @@ Resources:
 Outputs:
   BucketName:
     Value: !Ref RawBucket
+  LandingBucketName:
+    Value: !Ref LandingBucket
   FunctionName:
     Value: !Ref IngestFunction
   LogGroup:

@@ -21,7 +21,7 @@ except ImportError:
     sys.exit("boto3 missing. Fix: python3 -m pip install -U boto3")
 
 REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
-MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-3-5-sonnet-20241022-v2:0")
+MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 DAY1 = Path(__file__).resolve().parent.parent
 COUNTER = DAY1 / "outputs" / ".bedrock_calls"
 MAX_DAY1_CALLS = 3
@@ -86,7 +86,8 @@ def main():
     out.write_text(
         f"# M1 architecture options - {args.learner}\n\n"
         f"_model: {MODEL_ID} | tokens in/out: {usage['inputTokens']}/{usage['outputTokens']}_\n\n"
-        f"## Prompt\n\n{prompt}\n\n## Bedrock answer\n\n{text}\n"
+        f"## Prompt\n\n{prompt}\n\n## Bedrock answer\n\n{text}\n",
+        encoding="utf-8",
     )
     print(text)
     print(f"\n---\ntokens in={usage['inputTokens']} out={usage['outputTokens']} "
