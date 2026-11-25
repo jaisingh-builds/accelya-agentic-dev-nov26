@@ -89,6 +89,7 @@ All data in this repo is synthetic. Never paste real customer data into prompts,
 | `docs/service-boundary-6q.md` | The six questions for every service hop |
 | `docs/HITL_REVIEW_TEMPLATE.md` | Human review checklist - required before merge |
 | `docs/LOGGING_CONTRACT.md` | The logging standard every artefact is reviewed against (from Day 2) |
+| `docs/REFERENCE_ARCHITECTURE.md` | The agreed refund-pipeline architecture (Day 2) that Modules 6–10 build on; diagram in `docs/reference-architecture.png` |
 | `glossary/airline.md` | Airline vocabulary |
 | `day1/` … `day3/` | Per-module code, data, prompts, scripts, tests |
 | `slides/` | Day slides (pptx + pdf) |
