@@ -10,7 +10,7 @@ export AWS_DEFAULT_REGION="${ACCELYA_REGION:-us-east-1}"     # Pluralsight sandb
 # --resolve-s3: SAM creates/uses its own artifact bucket for the code package
 # CAPABILITY_NAMED_IAM: required because the template creates IAM roles with fixed names
 export F="--resolve-s3 --capabilities CAPABILITY_NAMED_IAM --region $AWS_DEFAULT_REGION"
-export BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.anthropic.claude-3-5-sonnet-20241022-v2:0}"
+export BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
 ACCT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)
 if [ -z "$ACCT" ]; then
   echo "NOTE: standard-sandbox profile 'accelya' not working yet. Fine for Lab 1 (uses accelya-ai)."
