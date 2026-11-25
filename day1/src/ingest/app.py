@@ -12,6 +12,7 @@ import os
 import sys
 import time
 import uuid
+import re
 from urllib.parse import unquote_plus
 
 import boto3
@@ -52,6 +53,14 @@ def _correlation_id(bucket, key, request_id):
         return f"m1-{request_id[:8]}-{uuid.uuid4().hex[:6]}", head["ContentLength"]
     except ClientError:
         return f"m1-{request_id[:8]}-{uuid.uuid4().hex[:6]}", None
+
+
+_AIRLINE_RE = re.compile(r"ticket_issue_([A-Z0-9]{2})_")
+
+
+def _parse_airline_code(key):
+    m = _AIRLINE_RE.search(key)
+    return m.group(1) if m else None
 
 
 def _count_records(bucket, key):
@@ -107,9 +116,10 @@ def handler(event, context):
         cid, size = _correlation_id(bucket, key, context.aws_request_id)
         started = time.time()
         rows = _count_records(bucket, key)
+        airline_code = _parse_airline_code(key)
         emit("INFO", "file.received", cid,
              boundary="s3->lambda", bucket=bucket, key=key, bytes=size,
-             record_count=rows, cold_start=cold,
+             record_count=rows, airline_code=airline_code, cold_start=cold,
              init_age_s=round(started - _INIT_AT, 1),
              memory_limit_mb=int(context.memory_limit_in_mb),
              duration_ms=int((time.time() - started) * 1000))
