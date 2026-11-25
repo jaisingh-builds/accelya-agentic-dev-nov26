@@ -1,0 +1,308 @@
+{
+ "files": {
+  "ticket_issue_AI_2026-11-25.csv": {
+   "file_route": "accepted",
+   "rows": [
+    {
+     "line": 2,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 3,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "airline code",
+     "field": "airline_code"
+    },
+    {
+     "line": 4,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "issue date",
+     "field": "issue_date"
+    },
+    {
+     "line": 5,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 6,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "agency",
+     "field": "agency_iata"
+    },
+    {
+     "line": 7,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 8,
+     "route": "quarantine",
+     "reason": "required",
+     "area": "ticket",
+     "field": "ticket_number"
+    },
+    {
+     "line": 9,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 10,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "PNR",
+     "field": "pnr"
+    },
+    {
+     "line": 11,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 12,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 13,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 14,
+     "route": "quarantine",
+     "reason": "referential",
+     "area": "OD pair",
+     "field": "od_pair"
+    },
+    {
+     "line": 15,
+     "route": "quarantine",
+     "reason": "referential",
+     "area": "airline code",
+     "field": "airline_code"
+    },
+    {
+     "line": 16,
+     "route": "quarantine",
+     "reason": "referential",
+     "area": "fare class",
+     "field": "fare_class"
+    },
+    {
+     "line": 17,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 18,
+     "route": "quarantine",
+     "reason": "business",
+     "area": "issue date",
+     "field": "issue_date"
+    },
+    {
+     "line": 19,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 20,
+     "route": "flagged",
+     "reason": "late",
+     "area": "issue date",
+     "field": "issue_date"
+    },
+    {
+     "line": 21,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "ticket",
+     "field": "ticket_number"
+    },
+    {
+     "line": 22,
+     "route": "duplicate",
+     "reason": "duplicate",
+     "area": "ticket",
+     "field": "ticket_number"
+    },
+    {
+     "line": 23,
+     "route": "quarantine",
+     "reason": "business",
+     "area": "OD pair",
+     "field": "od_pair"
+    },
+    {
+     "line": 24,
+     "route": "quarantine",
+     "reason": "required",
+     "area": "PNR",
+     "field": "pnr"
+    },
+    {
+     "line": 25,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 26,
+     "route": "quarantine",
+     "reason": "business",
+     "area": "fare break",
+     "field": "fare_amount"
+    },
+    {
+     "line": 27,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 28,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "fare class",
+     "field": "fare_class"
+    },
+    {
+     "line": 29,
+     "route": "quarantine",
+     "reason": "referential",
+     "area": "ticket",
+     "field": "ticket_number"
+    },
+    {
+     "line": 30,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 31,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "PNR",
+     "field": "pnr"
+    },
+    {
+     "line": 32,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "OD pair",
+     "field": "od_pair"
+    },
+    {
+     "line": 33,
+     "route": "quarantine",
+     "reason": "format",
+     "area": "fare break",
+     "field": "fare_amount"
+    },
+    {
+     "line": 34,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 35,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 36,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 37,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 38,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 39,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 40,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 41,
+     "route": "quarantine",
+     "reason": "referential",
+     "area": "fare break",
+     "field": "currency"
+    },
+    {
+     "line": 42,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    },
+    {
+     "line": 43,
+     "route": "validated",
+     "reason": "",
+     "area": "",
+     "field": ""
+    }
+   ]
+  },
+  "ticket_issue_AI_2026-11-25_resend.csv": {
+   "file_route": "quarantine",
+   "reason": "schema",
+   "rows": []
+  }
+ }
+}

@@ -1,0 +1,29 @@
+{
+  "version": "m3-<your-id>-1",
+  "_how": "Copy to validation_rules.json and complete it from your Lab 2 paper design. Rule types: day3/rules/RULE_TYPES.md. Every rule needs id, type, reason, on_fail and a one-line why.",
+  "_todo": [
+    "ticket_number: format (3-digit prefix, hyphen, 10 digits) and prefix belongs to the airline",
+    "airline_code: format (2 characters; digits are allowed, e.g. 6E)",
+    "fare_class: format and in the published list",
+    "od_pair: format, both airports known, origin different from destination",
+    "fare break: fare_amount max 2 decimal places and above 0; currency in the accepted list",
+    "issue_date: ISO format, not after the file's business date, late after 30 days (route it: quarantine or flag?)",
+    "agency_iata: 8 digits",
+    "required: which other fields can never be empty?"
+  ],
+  "file_rules": [
+    {"id": "F-01", "type": "header", "reason": "schema", "on_fail": "quarantine",
+     "columns": ["pnr", "ticket_number", "airline_code", "fare_class", "od_pair", "issue_date", "fare_amount", "currency", "agency_iata"],
+     "why": "A renamed or missing column breaks every rule after it: reject the whole file."}
+  ],
+  "rules": [
+    {"id": "R-01", "type": "required", "fields": ["pnr", "ticket_number"], "reason": "required", "on_fail": "quarantine",
+     "why": "No booking or ticket id means nothing to settle or trace."},
+    {"id": "R-02", "type": "regex", "field": "pnr", "pattern": "^[A-Z0-9]{6}$", "reason": "format", "on_fail": "quarantine",
+     "why": "PNR is 6 upper-case alphanumerics."},
+    {"id": "R-10", "type": "in_ref", "field": "airline_code", "ref": "airlines", "reason": "referential", "on_fail": "quarantine",
+     "why": "We only settle airlines we have a contract for."},
+    {"id": "R-19", "type": "unique", "field": "ticket_number", "reason": "duplicate", "on_fail": "skip",
+     "why": "Same ticket twice in one file: keep the first, skip and count the repeat."}
+  ]
+}
