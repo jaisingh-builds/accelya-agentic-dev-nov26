@@ -1,0 +1,8 @@
+dimension,what a 3 looks like,option_A,option_B,option_C,evidence (one line per option)
+correctness,meets the volume + ordering + decision-visibility requirements,3,2,3,"A: SQS FIFO + DDB idempotency covers ordering + EB gives real-time visibility | B: Aurora ordering works but Firehose lag hurts visibility (1-5 min) | C: SQS FIFO + DDB idempotency + SNS sub-2-sec visibility"
+security,no public endpoints; IAM scoped per hop; no PII in logs,3,3,3,"A: all IAM-scoped actions on specific ARNs; no PII logged | B: RDS Proxy + IAM auth; Firehose filters; no PII | C: all IAM-scoped; DDB streams internal; no PII logged"
+observability,correlation_id survives every hop; follows the logging contract,2,2,3,"A: event_id propagated but EB->SNS hop can lose context if rule misconfigured | B: event_id in SQL but CloudWatch Logs Insights query lag for tracing | C: event_id as PK in DDB, survives Streams to audit table and SNS"
+scalability,handles the disruption peak; retries + DLQ are designed in,3,2,3,"A: Lambda auto-scales; SQS FIFO 300/sec; DLQ configured | B: RDS Proxy pool may bottleneck at 50/min peaks | C: Lambda + Streams auto-scale; 24h Streams retention for replay"
+cost,cheapest option that meets the requirements at this volume,3,1,3,"A: ~$3-5/month all serverless | B: ~$70-150/month Aurora minimum overhead | C: ~$8-10/month all serverless"
+TOTAL (/15),,14,10,15,
+Decision: Option C (SQS FIFO -> Lambda -> DDB Streams -> Lambda -> DDB+SNS) — highest total at 15/15 and the only fully serverless option with automatic failure recovery via Streams 24h retention and per-PNR ordering guaranteed end-to-end.
