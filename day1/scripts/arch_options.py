@@ -62,7 +62,7 @@ def main():
     if calls >= MAX_DAY1_CALLS and not args.force:
         sys.exit(f"Budget guard: {calls} Bedrock calls already made today. Re-use your output, or pass --force.")
 
-    prompt = Path(args.prompt).read_text()
+    prompt = Path(args.prompt).read_text(encoding="utf-8")
     if "<FILL" in prompt:
         sys.exit(f"Edit {args.prompt} first - replace every <FILL ...> marker.")
 
@@ -130,7 +130,8 @@ def main():
     out.write_text(
         f"# Architecture options ({args.options}) - {args.learner}\n\n"
         f"_model: {MODEL_ID} | tokens in/out: {usage['inputTokens']}/{usage['outputTokens']}_\n\n"
-        f"## Prompt\n\n{prompt}\n\n## Bedrock answer\n\n{text}\n"
+        f"## Prompt\n\n{prompt}\n\n## Bedrock answer\n\n{text}\n",
+        encoding="utf-8",
     )
     print(text)
     print(f"\n---\ntokens in={usage['inputTokens']} out={usage['outputTokens']} "
