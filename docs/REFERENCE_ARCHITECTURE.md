@@ -154,6 +154,7 @@ Every row writes a decision record, so no event disappears silently. Same event_
   - `service = accelya-m7-<learner>-refund-decider`, `boundary = sqs(refund_events)->lambda(refund_decider)`.
   - Messages such as `refund.decided`, `refund.duplicate_skipped`, `refund.conflict`.
   - Keys allowed: `event_id`, `event_type`, `message_id`, `pnr`, `ticket_number`, `decision`, `refund_rule_id`, `attempt`, `duration_ms`, `error_type`. No amounts, no names.
+- **Metrics:** no metric code in the Lambda. Every decision is logged as `refund.decided` with `duration_ms`, and hop 9a turns those lines into metrics.
 - **Settings:** X-Ray active tracing. Timeout 30 s, memory 512 MB. DynamoDB on-demand with PITR on; TTL on idempotency items 90 days (the recovery replay horizon).
 
 ### Hop 6: Firehose to S3
@@ -177,6 +178,22 @@ Every row writes a decision record, so no event disappears silently. Same event_
 - **Over-refund check:** approved `refund_amount` per `ticket_number` must never exceed the booking fare. The query returns zero rows on a healthy system.
 - **Settlement:** `SUM(refund_amount)` (`DECIMAL(12,2)`) per `business_date` and `currency` where `decision='APPROVE'`.
 
+### Hop 9a: Custom metrics (metric filters, not EMF)
+- Business metrics come from **CloudWatch metric filters** on the decider's contract-conformant log lines. Namespace: `Accelya/Refunds`.
+- **Why not Embedded Metric Format (EMF):** an EMF record is a JSON log line with an `_aws` block and metric-name keys. Tested against the contract, `check_logs.py` rejects it with 7 violations (5 required keys missing, 2 keys not allowed). Metric filters need no extra code and no contract change.
+- If EMF is ever needed (many metrics, high volume), it is a **contract change**: a PR to `docs/logging-contract.json` (v1.2) that classes `_aws` records as metric records, the same way Lambda platform records are classed.
+
+| Metric | Filter pattern | Value | Dimensions | Used by |
+|---|---|---|---|---|
+| `RefundDecisions` | `{ $.message = "refund.decided" }` | 1 | `decision`, `refund_rule_id` | dashboard |
+| `ManualReviews` | `{ $.message = "refund.decided" && $.decision = "MANUAL_REVIEW" }` | 1 | – | alarm |
+| `RefundConflicts` | `{ $.message = "refund.conflict" }` | 1 | – | alarm |
+| `DuplicateDeliveries` | `{ $.message = "refund.duplicate_skipped" }` | 1 | – | dashboard |
+| `DecisionLatency` | `{ $.message = "refund.decided" }` | `$.duration_ms` (Milliseconds) | – | dashboard / p90 alarm |
+| `DeciderErrors` | `{ $.level = "ERROR" }` | 1 | `error_type` | alarm |
+
+The patterns were checked with `aws logs test-metric-filter` against sample contract-conformant lines; each matched only its intended lines. Keep dimensions to fields with a few values (`decision`, `refund_rule_id`, `error_type`). Never use `event_id` or `pnr`: every distinct value would create a new billed metric.
+
 ### Hop 9: CloudWatch alarms → SNS `ops-alerts`
 
 | Alarm | Condition |
@@ -188,7 +205,7 @@ Every row writes a decision record, so no event disappears silently. Same event_
 | Firehose | `DeliveryToS3.DataFreshness` > 900 s |
 | DynamoDB | `SystemErrors` > 0; `ThrottledRequests` > 0 |
 | SageMaker | `Invocation5XXErrors` > 0; `ModelSetupTime` p90 > 4 s |
-| Business | `R-CONFLICT` > 0; `MANUAL_REVIEW` > N per hour |
+| Business (hop 9a metrics) | `RefundConflicts` > 0; `ManualReviews` > N per hour; `DeciderErrors` > 0 |
 
 Log retention: 7 days in the labs, 30 in production.
 
