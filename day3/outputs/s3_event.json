@@ -1,0 +1,25 @@
+{
+ "Records": [
+  {
+   "eventVersion": "2.1",
+   "eventSource": "aws:s3",
+   "awsRegion": "us-east-1",
+   "eventTime": "2026-11-26T06:36:18.000Z",
+   "eventName": "ObjectCreated:Put",
+   "s3": {
+    "s3SchemaVersion": "1.0",
+    "configurationId": "day3-replay",
+    "bucket": {
+     "name": "accelya-m1-hassan-339713131210",
+     "arn": "arn:aws:s3:::accelya-m1-hassan-339713131210"
+    },
+    "object": {
+     "key": "raw/ticket_issue_AI_2026-11-25.csv",
+     "size": 2964,
+     "eTag": "3916ab33d669a45d8a98ad8276c532c9",
+     "sequencer": "0066A1B2C3D4E5F601"
+    }
+   }
+  }
+ ]
+}

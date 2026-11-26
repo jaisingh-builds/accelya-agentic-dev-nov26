@@ -14,3 +14,5 @@ day3/outputs/zones*/
 
 # Trainer-only material: never committed
 trainer-only/
+.idea/
+**/.idea/
