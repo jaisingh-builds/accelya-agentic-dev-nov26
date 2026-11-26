@@ -77,7 +77,7 @@ def main():
             system=[{"text": SYSTEM.format(n="TWO" if args.options == 2 else "THREE",
                                            words=600 if args.options == 2 else 850)}],
             messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 1200 if args.options == 2 else 1700, "temperature": 0.3},
+            inferenceConfig={"maxTokens": int(os.getenv("BEDROCK_MAX_TOKENS", 1200 if args.options == 2 else 1700)), "temperature": 0.3},
         )
     except ClientError as e:
         code = e.response["Error"]["Code"]
