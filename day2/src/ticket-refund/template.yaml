@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Accelya M2 sample - ticket refund window Lambda (SQS -> Lambda -> CloudWatch).
+  Decides refunds from the cancellation-to-departure window. Standard queue + DLQ,
+  event source mapping with ReportBatchItemFailures.
+
+Parameters:
+  LearnerId:
+    Type: String
+    Description: Your short learner id, lowercase (e.g. priya, rahul-k)
+    AllowedPattern: '^[a-z0-9-]{2,20}$'
+    ConstraintDescription: 2-20 chars, lowercase letters, digits, hyphen
+  MaxReceiveCount:
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 10
+    Description: A bad message is redelivered this many times, then moved to the DLQ
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Architectures: [x86_64]
+
+Resources:
+  # ---------- Queues ----------
+  TicketRefundsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'accelya-m2-${LearnerId}-ticket-refunds'
+      VisibilityTimeout: 180               # >= 6x the function timeout
+      MessageRetentionPeriod: 1209600      # 14 days
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt TicketRefundsDlq.Arn
+        maxReceiveCount: !Ref MaxReceiveCount
+
+  TicketRefundsDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'accelya-m2-${LearnerId}-ticket-refunds-dlq'
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  # ---------- Logs: explicit retention ----------
+  TicketRefundLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/accelya-m2-${LearnerId}-ticket-refund'
+      RetentionInDays: 7
+
+  # ---------- IAM: reads its own queue, writes its own logs, nothing else ----------
+  TicketRefundRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m2-${LearnerId}-ticket-refund-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: poll-ticket-refunds
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:ChangeMessageVisibility
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt TicketRefundsQueue.Arn
+        - PolicyName: write-own-log-group
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/accelya-m2-${LearnerId}-ticket-refund:*'
+
+  # ---------- Lambda ----------
+  TicketRefundFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: TicketRefundLogGroup
+    Properties:
+      FunctionName: !Sub 'accelya-m2-${LearnerId}-ticket-refund'
+      CodeUri: .
+      Handler: handler.handler
+      Role: !GetAtt TicketRefundRole.Arn
+      Environment:
+        Variables:
+          LEARNER_ID: !Ref LearnerId
+      Events:
+        TicketRefunds:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt TicketRefundsQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes: [ReportBatchItemFailures]
+
+Outputs:
+  QueueUrl:
+    Value: !Ref TicketRefundsQueue
+  QueueArn:
+    Value: !GetAtt TicketRefundsQueue.Arn
+  DlqArn:
+    Value: !GetAtt TicketRefundsDlq.Arn
+  FunctionName:
+    Value: !Ref TicketRefundFunction
+  LogGroup:
+    Value: !Ref TicketRefundLogGroup

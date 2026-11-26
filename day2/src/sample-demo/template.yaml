@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Accelya M2 sample - cancellation refund decision Lambda (SQS -> Lambda -> CloudWatch).
+  Standard queue with a DLQ, event source mapping with ReportBatchItemFailures.
+
+Parameters:
+  LearnerId:
+    Type: String
+    Description: Your short learner id, lowercase (e.g. priya, rahul-k)
+    AllowedPattern: '^[a-z0-9-]{2,20}$'
+    ConstraintDescription: 2-20 chars, lowercase letters, digits, hyphen
+  MaxReceiveCount:
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 10
+    Description: A bad message is redelivered this many times, then moved to the DLQ
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Architectures: [x86_64]
+
+Resources:
+  # ---------- Queues ----------
+  CancellationsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'accelya-m2-${LearnerId}-cancellations'
+      VisibilityTimeout: 180               # >= 6x the function timeout (30 s) so a redelivery can't fire while a batch is still running
+      MessageRetentionPeriod: 1209600      # 14 days
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt CancellationsDlq.Arn
+        maxReceiveCount: !Ref MaxReceiveCount
+
+  CancellationsDlq:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'accelya-m2-${LearnerId}-cancellations-dlq'
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  # ---------- Logs: explicit retention ----------
+  CancellationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/accelya-m2-${LearnerId}-cancellation'
+      RetentionInDays: 7
+
+  # ---------- IAM: the function reads its own queue and writes its own logs, nothing else ----------
+  CancellationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m2-${LearnerId}-cancellation-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: poll-cancellations
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:ChangeMessageVisibility
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt CancellationsQueue.Arn
+        - PolicyName: write-own-log-group
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/accelya-m2-${LearnerId}-cancellation:*'
+
+  # ---------- Lambda ----------
+  CancellationFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: CancellationLogGroup
+    Properties:
+      FunctionName: !Sub 'accelya-m2-${LearnerId}-cancellation'
+      CodeUri: .
+      Handler: handler.handler
+      Role: !GetAtt CancellationRole.Arn
+      Environment:
+        Variables:
+          LEARNER_ID: !Ref LearnerId
+      Events:
+        Cancellations:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt CancellationsQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes: [ReportBatchItemFailures]
+
+Outputs:
+  QueueUrl:
+    Value: !Ref CancellationsQueue
+  QueueArn:
+    Value: !GetAtt CancellationsQueue.Arn
+  DlqArn:
+    Value: !GetAtt CancellationsDlq.Arn
+  FunctionName:
+    Value: !Ref CancellationFunction
+  LogGroup:
+    Value: !Ref CancellationLogGroup
