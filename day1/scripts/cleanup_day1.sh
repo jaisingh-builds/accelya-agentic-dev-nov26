@@ -18,11 +18,13 @@ mkdir -p "$LOG_DIR"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 export MSYS_NO_PATHCONV=1
 aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/accelya-m1-${L}" \
-    --query 'logGroups[].logGroupName' --output text 2>/dev/null | tr '\t' '\n' | while read -r G; do
+    --query 'logGroups[].logGroupName' --output text 2>/dev/null | tr '\t' '\n' | tr -d '\r' | while read -r G; do
   [ -z "$G" ] && continue
   OUT="$LOG_DIR/$(echo "${G#/}" | tr '/ ' '__')-${STAMP}.log"
-  aws logs tail "$G" --since 30d --format short > "$OUT" 2>/dev/null || true
-  echo "Saved $(grep -c . "$OUT" 2>/dev/null || echo 0) log lines -> $OUT"
+  aws logs tail "$G" --since 30d --format short > "$OUT" 2>>"$OUT.err" || true
+  LINES=$(grep -c . "$OUT" 2>/dev/null || echo 0)
+  echo "Saved $LINES log lines -> $OUT"
+  if [ "$LINES" = "0" ]; then echo "WARNING: no log lines archived (see $OUT.err)"; fi
 done
 
 for STACK in "accelya-m1-${L}" "accelya-m1-${L}-dup"; do
