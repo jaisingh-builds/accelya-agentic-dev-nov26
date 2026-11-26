@@ -9,11 +9,15 @@ before anyone writes code.
   finance only settles clean tickets and can see, per file, what was rejected and why.**
 - Files: `ticket_issue_<airline>_<YYYY-MM-DD>.csv`, one per airline per business day, columns: pnr,
   ticket_number, airline_code, fare_class, od_pair, issue_date, fare_amount, currency, agency_iata.
-  Volume: <FILL: e.g. about 40 files a day, up to ~100,000 records each, most arriving 00:00-03:00 IST>.
+  Volume: about 40 files a day, up to ~100,000 records each, most arriving 00:00-03:00 IST.
 - Storage zones already agreed: raw (the file exactly as received, never changed), validated, quarantine
   (by reason), curated (for reporting, later).
 - Validation rule design from our team (summarise, don't paste JSON):
-  <FILL: your 5 most important rules, one line each, e.g. "ticket_number prefix must belong to the airline -> quarantine/referential">
+  all nine columns must be non-empty -> quarantine/required;
+  ticket_number must match NNN-NNNNNNNNNN and its 3-digit prefix must belong to the row's airline -> quarantine/format then quarantine/referential;
+  airline_code is 2 characters and in the contracted airlines list -> quarantine/format then quarantine/referential;
+  fare_amount has at most 2 decimals and is above 0, currency in the accepted ISO list -> quarantine/format / business / referential;
+  issue_date is ISO, not after the file's business date, older than 30 days -> flag/late; a repeated ticket_number in the same file -> skip/duplicate.
 - Standards every requirement must respect: docs/LOGGING_CONTRACT.md (one JSON object per log record,
   correlation_id on every record, identifiers and counts only - never record contents or fares).
 - Synthetic data only. Use airline vocabulary: pnr, ticket_number, fare_class, od_pair, settlement.
@@ -29,7 +33,7 @@ A good functional requirement looks like this:
 - Do not choose AWS services, write code or draw an architecture. That is the design step, tomorrow.
 - Do not estimate effort or cost in money.
 - Do not invent requirements the business didn't give: list them as open questions instead.
-- <FILL: one more non-goal of your own>
+- Do not prescribe reconciliation queries, dashboards or reviewer tooling - reporting design is a later module.
 
 ## OUTPUT FORMAT
 Markdown, at most 900 words, with exactly these `##` sections:
