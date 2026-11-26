@@ -1,0 +1,224 @@
+{
+  "title": "M3 Lab 2 - validation rule design (paper first)",
+  "learner": "vikramsing",
+  "module": "M3",
+  "lab": "Lab 2",
+  "branch": "day3-vikramsing",
+  "date": "2026-11-26",
+  "status": "draft - 6 rules designed, 12 empty rows still to do",
+  "source_markdown": "day3/design/validation-rules.template.md",
+  "file": "day3/data/ticket_issue_AI_2026-11-25.csv",
+  "categories": [
+    "required",
+    "format",
+    "referential",
+    "business",
+    "late",
+    "duplicate"
+  ],
+  "routes": {
+    "quarantine": "quarantine/<category>/",
+    "flag": "validated/ with a flag",
+    "skip": "not written, counted"
+  },
+  "rules": [
+    {
+      "rule_id": "R-01",
+      "area": "all",
+      "field": "pnr, ticket_number, ...",
+      "check": "must not be empty",
+      "category": "required",
+      "route": "quarantine",
+      "why": "nothing to settle or trace without them"
+    },
+    {
+      "rule_id": "R-02",
+      "area": "PNR",
+      "field": "pnr",
+      "check": "6 upper-case letters/digits",
+      "category": "format",
+      "route": "quarantine",
+      "why": ""
+    },
+    {
+      "rule_id": "R-03",
+      "area": "airline code",
+      "field": "airline_code",
+      "check": "2 characters, letters or digits (digits allowed, e.g. 6E)",
+      "category": "format",
+      "route": "quarantine",
+      "why": "an IATA airline code is always 2 characters"
+    },
+    {
+      "rule_id": "R-10",
+      "area": "airline code",
+      "field": "airline_code",
+      "check": "is in the airlines reference list",
+      "category": "referential",
+      "route": "quarantine",
+      "why": "we only settle airlines we have a contract for"
+    },
+    {
+      "rule_id": "R-04",
+      "area": "fare class",
+      "field": "fare_class",
+      "check": "exactly 1 upper-case letter",
+      "category": "format",
+      "route": "quarantine",
+      "why": "booking classes are single capital letters"
+    },
+    {
+      "rule_id": "R-11",
+      "area": "fare class",
+      "field": "fare_class",
+      "check": "is in the published fare class list",
+      "category": "referential",
+      "route": "quarantine",
+      "why": "a class the airline does not publish cannot be priced or refunded"
+    },
+    {
+      "rule_id": "",
+      "area": "OD pair",
+      "field": "od_pair",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "OD pair",
+      "field": "od_pair",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "OD pair",
+      "field": "od_pair",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "fare break",
+      "field": "fare_amount",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "fare break",
+      "field": "fare_amount",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "fare break",
+      "field": "currency",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "ticket",
+      "field": "ticket_number",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "ticket",
+      "field": "ticket_number",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "issue date",
+      "field": "issue_date",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "issue date",
+      "field": "issue_date",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "issue date",
+      "field": "issue_date",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "agency",
+      "field": "agency_iata",
+      "check": "",
+      "category": "",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "",
+      "area": "ticket",
+      "field": "ticket_number",
+      "check": "seen earlier in this file",
+      "category": "duplicate",
+      "route": "",
+      "why": ""
+    },
+    {
+      "rule_id": "F-01",
+      "area": "whole file",
+      "field": "header",
+      "check": "columns exactly as agreed",
+      "category": "schema",
+      "route": "quarantine whole file",
+      "why": ""
+    }
+  ],
+  "routing_decisions": [
+    {
+      "number": 1,
+      "topic": "Late ticket",
+      "question": "**Late ticket** (valid, issued 56 days before the file date): quarantine or flag? Why?"
+    },
+    {
+      "number": 2,
+      "topic": "Duplicate ticket in the same file",
+      "question": "**Duplicate ticket in the same file**: quarantine or skip? What must the manifest show?"
+    },
+    {
+      "number": 3,
+      "topic": "Header renamed",
+      "question": "**Header renamed** (`currency` → `fare_currency`): reject one record, or the whole file? Why?"
+    }
+  ],
+  "dates_question": "Which date do your date rules compare against: today's date, or the file's business date? What happens on a rerun next month?"
+}
