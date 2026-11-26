@@ -89,7 +89,9 @@ def main():
         try:
             resp = client.converse(modelId=model, system=[{"text": SYSTEM}],
                                    messages=[{"role": "user", "content": [{"text": prompt}]}],
-                                   inferenceConfig={"maxTokens": 3000, "temperature": 0.2})
+                                   # course budget is 20,000 tokens per learner: BEDROCK_MAX_TOKENS caps a run
+                                   inferenceConfig={"maxTokens": int(os.getenv("BEDROCK_MAX_TOKENS", 3000)),
+                                                    "temperature": 0.2})
             model_used = model
             break
         except ClientError as e:
