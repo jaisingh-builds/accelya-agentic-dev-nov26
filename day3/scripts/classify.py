@@ -2,7 +2,7 @@
 """Day 3 - classify a ticket-issue batch file with a rules file, and show where every record goes.
 
 This is a DESIGN tool, run locally: it applies the validation rules you wrote in
-day3/rules/validation_rules.json to a synthetic batch file, routes every record to a zone, and
+day3/rules/validation_rules_ganesh.json to a synthetic batch file, routes every record to a zone, and
 (optionally) writes the zone layout to a local folder so you can see it. Day 4 builds the real
 Lambda validator from the same rules file.
 
@@ -34,7 +34,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DAY3 = ROOT / "day3"
 REF_DIR = DAY3 / "data" / "ref"
-DEFAULT_RULES = DAY3 / "rules" / "validation_rules.json"
+DEFAULT_RULES = DAY3 / "rules" / "validation_rules_ganesh.json"
 EXPECTED = DAY3 / "data" / "expected_routing.json"
 
 PHASES = ["required", "format", "referential", "business", "late", "duplicate"]
@@ -278,7 +278,7 @@ def compare(path, file_res, results):
 def main():
     ap = argparse.ArgumentParser(description="Classify a ticket-issue batch with your validation rules (local, no AWS)")
     ap.add_argument("file", help="CSV batch file, e.g. day3/data/ticket_issue_AI_2026-11-25.csv")
-    ap.add_argument("--rules", default=str(DEFAULT_RULES), help="rules file (default: day3/rules/validation_rules.json)")
+    ap.add_argument("--rules", default=str(DEFAULT_RULES), help="rules file (default: day3/rules/validation_rules_ganesh.json)")
     ap.add_argument("--zones", help="write the zone layout to this local folder, e.g. day3/outputs/zones")
     ap.add_argument("--check", action="store_true", help="compare the routing with day3/data/expected_routing.json")
     ap.add_argument("--cid", help="correlation_id for the manifest (default: minted)")
@@ -286,7 +286,7 @@ def main():
 
     if not Path(args.rules).exists():
         raise SystemExit(f"No rules file at {args.rules}. Start from the template:\n"
-                         "  cp day3/rules/validation_rules.template.json day3/rules/validation_rules.json")
+                         "  cp day3/rules/validation_rules_ganesh.template.json day3/rules/validation_rules_ganesh.json")
     _data, file_rules, rules = load_rules(args.rules)
     ref = load_ref()
     try:
