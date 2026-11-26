@@ -1,0 +1,241 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Accelya M1 Option 2 - S3 -> EventBridge -> Step Functions -> Lambda (Batch Validator)
+  -> DynamoDB -> CloudWatch Logs -> SNS notification pipeline.
+  Learner: Amol
+
+Parameters:
+  LearnerId:
+    Type: String
+    Default: amol
+    Description: Your short learner id, lowercase (e.g. priya, rahul-k)
+    AllowedPattern: '^[a-z0-9-]{2,20}$'
+    ConstraintDescription: 2-20 chars, lowercase letters, digits, hyphen
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 60
+    MemorySize: 256
+    Architectures: [x86_64]
+
+Resources:
+  # ---------- S3: immutable raw zone ----------
+  RawBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'accelya-m1-${LearnerId}-${AWS::AccountId}'
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ---------- EventBridge: route S3 events to Step Functions ----------
+  IngestRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'accelya-m1-${LearnerId}-ingest-rule'
+      Description: Route S3 raw/ uploads to Step Functions
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - Object Created
+        detail:
+          bucket:
+            name:
+              - !Ref RawBucket
+          object:
+            key:
+              - prefix: raw/
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt IngestStateMachine.Arn
+          Id: StepFunctionsTarget
+          RoleArn: !GetAtt EventBridgeStepFunctionsRole.Arn
+
+  # ---------- IAM: EventBridge -> Step Functions ----------
+  EventBridgeStepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-eb-sfn-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: events.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: start-state-machine
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: states:StartExecution
+                Resource: !GetAtt IngestStateMachine.Arn
+
+  # ---------- DynamoDB: settlement ledger ----------
+  SettlementTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'accelya-m1-${LearnerId}-settlement'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pnr
+          AttributeType: S
+        - AttributeName: ticket_number
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pnr
+          KeyType: HASH
+        - AttributeName: ticket_number
+          KeyType: RANGE
+
+  # ---------- SNS: settlement notification ----------
+  SettlementTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'accelya-m1-${LearnerId}-settlement-notify'
+
+  # ---------- IAM: Lambda execution role ----------
+  BatchValidatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-batch-validator-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: read-raw-zone
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:HeadObject
+                Resource: !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}/raw/*'
+        - PolicyName: write-settlement-table
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:PutItem
+                Resource: !GetAtt SettlementTable.Arn
+        - PolicyName: publish-settlement-notify
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref SettlementTopic
+
+  # ---------- Logs: explicit retention ----------
+  BatchValidatorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/accelya-m1-${LearnerId}-batch-validator'
+      RetentionInDays: 7
+
+  # ---------- Lambda: batch validator ----------
+  BatchValidatorFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: BatchValidatorLogGroup
+    Properties:
+      FunctionName: !Sub 'accelya-m1-${LearnerId}-batch-validator'
+      CodeUri: src/batch_validator/
+      Handler: app.handler
+      Role: !GetAtt BatchValidatorRole.Arn
+      Environment:
+        Variables:
+          LEARNER_ID: !Ref LearnerId
+          SETTLEMENT_TABLE: !Ref SettlementTable
+          SETTLEMENT_TOPIC_ARN: !Ref SettlementTopic
+
+  # ---------- IAM: Step Functions execution role ----------
+  StepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'accelya-m1-${LearnerId}-sfn-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: states.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-batch-validator
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt BatchValidatorFunction.Arn
+
+  # ---------- Step Functions: orchestrator ----------
+  IngestStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: !Sub 'accelya-m1-${LearnerId}-ingest-sfn'
+      Role: !GetAtt StepFunctionsRole.Arn
+      Definition:
+        Comment: !Sub 'Accelya M1 ingest orchestrator - learner ${LearnerId}'
+        StartAt: BatchValidate
+        States:
+          BatchValidate:
+            Type: Task
+            Resource: !GetAtt BatchValidatorFunction.Arn
+            Parameters:
+              bucket.$: $.detail.bucket.name
+              key.$: $.detail.object.key
+              correlation_id.$: $.id
+            ResultPath: $.result
+            Retry:
+              - ErrorEquals: [States.TaskFailed]
+                IntervalSeconds: 5
+                MaxAttempts: 3
+                BackoffRate: 2.0
+            Catch:
+              - ErrorEquals: [States.ALL]
+                Next: FailureNotify
+                ResultPath: $.error
+            Next: SuccessEnd
+          FailureNotify:
+            Type: Pass
+            Result: FAILED
+            ResultPath: $.status
+            End: true
+          SuccessEnd:
+            Type: Succeed
+
+Outputs:
+  BucketName:
+    Value: !Ref RawBucket
+  StateMachineName:
+    Value: !GetAtt IngestStateMachine.Name
+  StateMachineArn:
+    Value: !GetAtt IngestStateMachine.Arn
+  SettlementTableName:
+    Value: !Ref SettlementTable
+  BatchValidatorFunctionName:
+    Value: !Ref BatchValidatorFunction
+  LogGroup:
+    Value: !Ref BatchValidatorLogGroup
+  SettlementTopicArn:
+    Value: !Ref SettlementTopic
