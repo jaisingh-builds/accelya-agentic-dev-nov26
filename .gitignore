@@ -11,6 +11,7 @@ samconfig.toml
 venv/
 **/outputs/.bedrock_calls
 day3/outputs/zones*/
+day1/outputs/logs/
 
 # Trainer-only material: never committed
 trainer-only/
