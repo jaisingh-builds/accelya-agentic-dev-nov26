@@ -18,7 +18,7 @@ Output decision: {"decision": "APPROVE", "refund_rule_id": "R-SAVER", "refund_am
 - No classes, factories or strategy patterns. Plain functions.
 - Do not call SQS, S3 or any AWS API. Do not send messages anywhere.
 - Do not log the message body, passenger_name, contact_email or fare_amount.
-<FILL: one more non-goal of your own>
+- No step funcion today
 
 ## OUTPUT FORMAT
 Return ONE complete Python file for day2/src/cancellation/handler.py, then a 5-line list of the decisions you made and why. No other text.

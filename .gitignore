@@ -11,3 +11,13 @@ samconfig.toml
 venv/
 **/outputs/.bedrock_calls
 day3/outputs/zones*/
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.vscode/
+*.code-workspace
+# Windows / OneDrive folder settings
+desktop.ini
