@@ -11,7 +11,7 @@ export L="$1"
 export AWS_DEFAULT_REGION="${ACCELYA_REGION:-us-east-1}"     # Pluralsight sandbox: us-east-1 or us-west-2 only
 # --resolve-s3: SAM creates/uses its own artifact bucket for the code package
 # CAPABILITY_NAMED_IAM: required because the template creates IAM roles with fixed names
-export F="--resolve-s3 --capabilities CAPABILITY_NAMED_IAM --region $AWS_DEFAULT_REGION"
+unset F 2>/dev/null; export F="--resolve-s3 --capabilities CAPABILITY_NAMED_IAM --region $AWS_DEFAULT_REGION"
 # Bedrock model: arch_options.py / draft_brd.py pick the first available current Claude model.
 # Override only if the trainer tells you to: export BEDROCK_MODEL_ID=<inference profile id>
 ACCT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null)

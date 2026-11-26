@@ -79,6 +79,25 @@ python3 day3/scripts/draft_brd.py --learner $L --profile accelya-ai --draft 2   
 # Lab 4 fallback: day3/samples/m3-brd-sample-v1.md and -v2.md (real rehearsal drafts)
 ```
 
+## Day 4 in one screen
+
+```bash
+source .venv/bin/activate && source day1/scripts/env.sh <your-id>
+git checkout main && git pull && git checkout -b day4-$L
+pip install -q -r requirements.txt                            # adds aws-lambda-powertools 3.41.0 (same as the Lambda layer)
+
+# Every Day 4 command, in lab order: day4/LABS.md
+python3 day4/tests/run_tests.py                               # the scoreboard: 0/23 -> 17/23 (Lab 2) -> 23/23 (Lab 3)
+git show day3-$L:day3/rules/validation_rules.json > day4/src/processor/rules/validation_rules.json  # Lab 1: your Day 3 rules ship with the Lambda (they live on day3-$L, not main)
+python3 day4/scripts/check_structure.py                       # coding standards: 13/13
+# Labs 2-3: build service.py, then handler.py, with day4/prompts/m4-processor-prompt.md
+
+# Lab 4 - deploy (STANDARD sandbox), land the file, verify, set retention, clean up
+export AWS_PROFILE=accelya && source day4/scripts/env.sh $L   # sets S, B, FN, LG, Q
+(cd day4 && sam build && sam deploy --stack-name $S $F --parameter-overrides LearnerId=$L)
+bash day4/scripts/cleanup_day4.sh $L
+```
+
 All data in this repo is synthetic. Never paste real customer data into prompts, logs or reviews.
 
 ## Layout
@@ -91,7 +110,7 @@ All data in this repo is synthetic. Never paste real customer data into prompts,
 | `docs/LOGGING_CONTRACT.md` | The logging standard every artefact is reviewed against (from Day 2) |
 | `docs/REFERENCE_ARCHITECTURE.md` | The agreed refund-pipeline architecture (Day 2) that Modules 6–10 build on; diagram in `docs/reference-architecture.png` |
 | `glossary/airline.md` | Airline vocabulary |
-| `day1/` … `day3/` | Per-module code, data, prompts, scripts, tests |
+| `day1/` … `day4/` | Per-module code, data, prompts, scripts, tests |
 | `slides/` | Day slides (pptx + pdf) |
 
 ## Rules of the road
