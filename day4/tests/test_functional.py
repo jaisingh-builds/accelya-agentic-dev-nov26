@@ -43,7 +43,7 @@ def routing_from_outputs(s3):
 
 
 @unittest.skipUnless(_paths.PKG_RULES.exists(), "copy your Day 3 rules first: "
-                     "cp day3/rules/validation_rules.json day4/src/processor/rules/")
+                     "git show day3-$L:day3/rules/validation_rules.json > day4/src/processor/rules/validation_rules.json (LABS.md Lab 1)")
 class FunctionalTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

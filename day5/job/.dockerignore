@@ -1,0 +1,6 @@
+# Only what the image needs goes into the build context.
+*
+!enrich.py
+!requirements.txt
+!ref/
+!ref/*.json

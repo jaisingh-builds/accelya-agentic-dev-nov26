@@ -28,7 +28,7 @@ def main():
     rows = []          # (ok, label, detail)
 
     for f in REQUIRED:
-        hint = "cp day3/rules/validation_rules.json day4/src/processor/rules/" if f.endswith("rules.json") else "missing"
+        hint = "Lab 1: git show day3-$L:day3/rules/validation_rules.json > day4/src/processor/rules/validation_rules.json" if f.endswith("rules.json") else "missing"
         rows.append(((SRC / f).exists(), f"tree: {f}", hint))
     rows.append((any(TESTS.glob("test_*.py")), "tree: tests/test_*.py", "missing"))
 
