@@ -30,6 +30,7 @@ def _rules():
     return _ruleset
 
 
+@logger.inject_lambda_context(clear_state=True)
 def handler(event, context):
     """For each S3 record in the event:
       1. bucket and key (unquote_plus the key)
@@ -43,4 +44,36 @@ def handler(event, context):
     Decorate the handler with Powertools' inject_lambda_context(clear_state=True) so every line carries
     cold_start and memory_limit_mb, and no key leaks from one invocation into the next.
     """
-    raise NotImplementedError("Lab 3: implement handler")
+    statuses = []
+    for record in event.get("Records", []):
+        bucket = record["s3"]["bucket"]["name"]
+        key = unquote_plus(record["s3"]["object"]["key"])
+        cid, size, minted = _correlation_id(bucket, key, context)
+        logger.set_correlation_id(cid)
+        if minted:
+            logger.warning("metadata.missing", extra={"boundary": "s3->lambda", "key": key})
+        logger.info("file.received", extra={"boundary": "s3->lambda", "bucket": bucket, "key": key, "bytes": size})
+        try:
+            result = process_object(s3, CFG, _rules(), bucket, key, cid, logger)
+        except RecoverableError as e:
+            cause = e.__cause__
+            code = cause.response["Error"]["Code"] if isinstance(cause, ClientError) else str(e)
+            logger.error("file.retry", extra={"key": key, "error_type": "RecoverableError", "error_code": code})
+            raise
+        except Exception as e:
+            logger.error("file.failed", extra={"key": key, "error_type": type(e).__name__})
+            raise
+        statuses.append(result["status"])
+    return {"files": len(statuses), "statuses": statuses}
+
+
+def _correlation_id(bucket, key, context):
+    """The uploader's id from object metadata; mint one when it is missing, invalid, or the object is gone."""
+    try:
+        head = s3.head_object(Bucket=bucket, Key=key)
+    except ClientError:
+        head = {}                       # process_object reports missing objects / access problems itself
+    cid = (head.get("Metadata") or {}).get("correlation-id", "")
+    if CID_OK.match(cid):
+        return cid, head.get("ContentLength"), False
+    return "m4-" + context.aws_request_id[:12], head.get("ContentLength"), True

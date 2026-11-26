@@ -88,6 +88,7 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/lambda/accelya-m4-${LearnerId}-processor'
+      RetentionInDays: 14
 
   ProcessorFunction:
     Type: AWS::Serverless::Function
