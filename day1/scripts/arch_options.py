@@ -95,9 +95,11 @@ def main():
         resp = client.converse(
             modelId=model,
             system=[{"text": SYSTEM.format(n="TWO" if args.options == 2 else "THREE",
-                                           words=600 if args.options == 2 else 850)}],
+                                           words=int(os.getenv("BEDROCK_MAX_WORDS", 600 if args.options == 2 else 850)))}],
             messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 2500 if args.options == 2 else 3500, "temperature": 0.3},
+            # course budget is 20,000 tokens per learner: BEDROCK_MAX_TOKENS lets you cap a run below the default
+            inferenceConfig={"maxTokens": int(os.getenv("BEDROCK_MAX_TOKENS", 2500 if args.options == 2 else 3500)),
+                             "temperature": 0.3},
         )
         MODEL_ID = model
         break
