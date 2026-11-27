@@ -1,0 +1,43 @@
+{
+ "_note": "Answer key for day5/sql/10_unmatched_remittance.sql and 11_settlement_recon.sql (settlement 2026-11-27).",
+ "settlement_date": "2026-11-27",
+ "tickets_total": 606,
+ "unmatched_remittance": [
+  {
+   "ticket_number": "098-0000000417",
+   "reason": "UNKNOWN_TICKET"
+  },
+  {
+   "ticket_number": "098-2029925750",
+   "reason": "AMOUNT_MISMATCH"
+  },
+  {
+   "ticket_number": "098-7020365974",
+   "reason": "AMOUNT_MISMATCH"
+  },
+  {
+   "ticket_number": "098-8848071425",
+   "reason": "AMOUNT_MISMATCH"
+  },
+  {
+   "ticket_number": "176-0000009921",
+   "reason": "UNKNOWN_TICKET"
+  }
+ ],
+ "recon_status_counts": {
+  "MATCHED": 351,
+  "AMOUNT_MISMATCH": 3,
+  "MISSING_REMITTANCE": 5,
+  "UNKNOWN_TICKET": 2,
+  "NOT_DUE": 247
+ },
+ "missing_remittance": [
+  "098-1590811574",
+  "098-4280305120",
+  "098-5692779739",
+  "098-7602765791",
+  "098-8633734422"
+ ],
+ "recon_rows": 608,
+ "_recon_rows_note": "606 tickets + 2 remittance-only lines; ticket_number is unique on each side (fixture assumption)"
+}

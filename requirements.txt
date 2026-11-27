@@ -1,1 +1,3 @@
 boto3>=1.34.120
+aws-lambda-powertools==3.41.0   # same version as the Lambda layer (day4/template.yaml)
+pyarrow==21.0.0                 # Day 5: Parquet (same version as day5/job/requirements.txt)

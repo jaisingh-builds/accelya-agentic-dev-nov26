@@ -10,7 +10,9 @@ S3 notifications usually arrive in seconds but can take a minute or longer: if a
 source .venv/bin/activate                      # Windows Git Bash: source .venv/Scripts/activate
 pip install -q -r requirements.txt
 source day1/scripts/env.sh <id>                # sets L, B, LG
-git add day2 && git commit -m "m2: $L" && git push   # yesterday's work first ("nothing to commit" is fine)
+git add day2                                   # yesterday's work first: three steps, so the push runs
+git commit -m "m2: $L"                         # "nothing to commit" is fine
+git push
 git checkout main && git pull
 git checkout -b day3-$L
 python3 day3/tests/test_classify.py            # classify self-test: OK (23 checks)
