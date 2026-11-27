@@ -77,6 +77,7 @@ aws logs tail $LG --since 15m --format short | grep "$L-d4-001" | grep -c '"mess
 aws s3 cp day3/data/ticket_issue_AI_2026-11-25.csv s3://$B/raw/ --metadata correlation-id=$L-d4-002
 sleep 20; aws logs tail $LG --since 15m --format short | grep "$L-d4-002" | grep -o '"message":"[a-z_.]*"'
 
+
 # 5. no metadata + wrong header: whole file to quarantine/schema, a minted id and a WARNING
 aws s3 cp day3/data/ticket_issue_AI_2026-11-25_resend.csv s3://$B/raw/
 sleep 20; aws logs tail $LG --since 15m --format short | grep -E 'metadata.missing|file.quarantined' | grep -o '"correlation_id":"[^"]*","boundary":"[^"]*","message":"[a-z_.]*"'
