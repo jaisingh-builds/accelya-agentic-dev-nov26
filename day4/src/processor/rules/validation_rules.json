@@ -1,29 +1,66 @@
 {
-  "version": "m3-<your-id>-1",
-  "_how": "Copy to validation_rules.json and complete it from your Lab 2 paper design. Rule types: day3/rules/RULE_TYPES.md. Every rule needs id, type, reason, on_fail and a one-line why.",
-  "_todo": [
-    "ticket_number: format (3-digit prefix, hyphen, 10 digits) and prefix belongs to the airline",
-    "airline_code: format (2 characters; digits are allowed, e.g. 6E)",
-    "fare_class: format and in the published list",
-    "od_pair: format, both airports known, origin different from destination",
-    "fare break: fare_amount max 2 decimal places and above 0; currency in the accepted list",
-    "issue_date: ISO format, not after the file's business date, late after 30 days (route it: quarantine or flag?)",
-    "agency_iata: 8 digits",
-    "required: which other fields can never be empty?"
-  ],
+  "version": "m3-ganesh-1",
   "file_rules": [
     {"id": "F-01", "type": "header", "reason": "schema", "on_fail": "quarantine",
      "columns": ["pnr", "ticket_number", "airline_code", "fare_class", "od_pair", "issue_date", "fare_amount", "currency", "agency_iata"],
-     "why": "A renamed or missing column breaks every rule after it: reject the whole file."}
+     "why": "A renamed column (currency -> fare_currency) shifts every downstream mapping; safer to reject the whole file than silently misroute all rows."}
   ],
   "rules": [
-    {"id": "R-01", "type": "required", "fields": ["pnr", "ticket_number"], "reason": "required", "on_fail": "quarantine",
-     "why": "No booking or ticket id means nothing to settle or trace."},
+    {"id": "R-01", "type": "required", "fields": ["pnr", "ticket_number", "airline_code", "fare_class", "od_pair", "issue_date", "fare_amount", "currency", "agency_iata"], "reason": "required", "on_fail": "quarantine",
+     "why": "Nothing to settle or trace without them."},
+
     {"id": "R-02", "type": "regex", "field": "pnr", "pattern": "^[A-Z0-9]{6}$", "reason": "format", "on_fail": "quarantine",
-     "why": "PNR is 6 upper-case alphanumerics."},
-    {"id": "R-10", "type": "in_ref", "field": "airline_code", "ref": "airlines", "reason": "referential", "on_fail": "quarantine",
-     "why": "We only settle airlines we have a contract for."},
-    {"id": "R-19", "type": "unique", "field": "ticket_number", "reason": "duplicate", "on_fail": "skip",
-     "why": "Same ticket twice in one file: keep the first, skip and count the repeat."}
+     "why": "BSP PNR format; lowercase or wrong length cannot be matched to GDS."},
+
+    {"id": "R-03", "type": "regex", "field": "airline_code", "pattern": "^[A-Z]{2}$", "reason": "format", "on_fail": "quarantine",
+     "why": "IATA airline codes are always 2 letters; 3-letter codes (e.g. AIR) are not valid IATA."},
+
+    {"id": "R-04", "type": "in_ref", "field": "airline_code", "ref": "airlines", "reason": "referential", "on_fail": "quarantine",
+     "why": "Unknown airline code cannot be settled; no contract on file."},
+
+    {"id": "R-05", "type": "regex", "field": "fare_class", "pattern": "^[A-Z]$", "reason": "format", "on_fail": "quarantine",
+     "why": "Booking class is a single character; lowercase (k) is a data-entry error."},
+
+    {"id": "R-06", "type": "in_ref", "field": "fare_class", "ref": "fare_classes", "reason": "referential", "on_fail": "quarantine",
+     "why": "Class not in airline's published inventory cannot be priced."},
+
+    {"id": "R-07", "type": "regex", "field": "od_pair", "pattern": "^[A-Z]{3}-[A-Z]{3}$", "reason": "format", "on_fail": "quarantine",
+     "why": "Missing hyphen (BOMDXB) or wrong length cannot be parsed into origin/destination."},
+
+    {"id": "R-08", "type": "od_distinct", "field": "od_pair", "reason": "business", "on_fail": "quarantine",
+     "why": "A ticket from and to the same airport (BOM-BOM) is not a valid itinerary."},
+
+    {"id": "R-09", "type": "od_airports_in_ref", "field": "od_pair", "reason": "referential", "on_fail": "quarantine",
+     "why": "Unknown airport code (XYZ) cannot be routed or settled."},
+
+    {"id": "R-10", "type": "decimal_places", "field": "fare_amount", "max_places": 2, "reason": "format", "on_fail": "quarantine",
+     "why": "Extra decimals (4520.555) indicate a calculation error; cannot round without losing audit trail."},
+
+    {"id": "R-11", "type": "min_exclusive", "field": "fare_amount", "value": 0, "reason": "business", "on_fail": "quarantine",
+     "why": "Negative fare amount (refund/void) belongs in a separate adjustment file, not a ticket-issue file."},
+
+    {"id": "R-12", "type": "in_ref", "field": "currency", "ref": "currencies", "reason": "referential", "on_fail": "quarantine",
+     "why": "Unknown currency (INX) cannot be converted or settled."},
+
+    {"id": "R-13", "type": "regex", "field": "ticket_number", "pattern": "^[0-9]{3}-[0-9]{10}$", "reason": "format", "on_fail": "quarantine",
+     "why": "BSP ticket number must be exactly 13 digits plus separator; wrong length (098-75716779) cannot be matched."},
+
+    {"id": "R-14", "type": "ticket_prefix", "field": "ticket_number", "airline_field": "airline_code", "reason": "referential", "on_fail": "quarantine",
+     "why": "Prefix/airline mismatch (125- with AI) means the ticket was issued on a different carrier's stock."},
+
+    {"id": "R-15", "type": "date_format", "field": "issue_date", "format": "%Y-%m-%d", "reason": "format", "on_fail": "quarantine",
+     "why": "Non-ISO format (25/11/2026) cannot be reliably parsed across locales."},
+
+    {"id": "R-16", "type": "date_not_after_file_date", "field": "issue_date", "reason": "business", "on_fail": "quarantine",
+     "why": "A ticket issued after the file date is impossible; indicates a date error."},
+
+    {"id": "R-17", "type": "date_within_days", "field": "issue_date", "days": 30, "reason": "late", "on_fail": "flag",
+     "why": "Late tickets are valid but need manual settlement review; flag rather than reject to preserve revenue."},
+
+    {"id": "R-18", "type": "regex", "field": "agency_iata", "pattern": "^[0-9]{8}$", "reason": "format", "on_fail": "quarantine",
+     "why": "IATA agency codes are always 8 numeric digits; wrong format cannot be looked up in BSP agency register."},
+
+    {"id": "D-01", "type": "unique", "field": "ticket_number", "reason": "duplicate", "on_fail": "skip",
+     "why": "Same ticket appearing twice in one file is a system duplicate; count it but do not write it twice."}
   ]
 }

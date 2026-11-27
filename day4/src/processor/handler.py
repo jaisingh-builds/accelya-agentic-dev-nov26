@@ -30,6 +30,7 @@ def _rules():
     return _ruleset
 
 
+@logger.inject_lambda_context(clear_state=True)
 def handler(event, context):
     """For each S3 record in the event:
       1. bucket and key (unquote_plus the key)
@@ -43,4 +44,48 @@ def handler(event, context):
     Decorate the handler with Powertools' inject_lambda_context(clear_state=True) so every line carries
     cold_start and memory_limit_mb, and no key leaks from one invocation into the next.
     """
-    raise NotImplementedError("Lab 3: implement handler")
+    statuses = []
+    for record in event.get("Records", []):
+        bucket = record["s3"]["bucket"]["name"]
+        key = unquote_plus(record["s3"]["object"]["key"])
+
+        # head_object once: get both metadata (for cid) and ContentLength (for file.received)
+        byte_count = 0
+        raw_cid = ""
+        try:
+            head = s3.head_object(Bucket=bucket, Key=key)
+            raw_cid = head.get("Metadata", {}).get("correlation-id", "")
+            byte_count = head.get("ContentLength", 0)
+        except ClientError:
+            pass
+
+        # Resolve correlation_id; mint one and warn if the metadata value is missing or invalid
+        if raw_cid and CID_OK.match(raw_cid):
+            cid = raw_cid
+        else:
+            cid = "m4-" + context.aws_request_id[:12]
+
+        # Set correlation_id on the logger BEFORE any logging for this record
+        logger.set_correlation_id(cid)
+
+        if not (raw_cid and CID_OK.match(raw_cid)):
+            logger.warning("metadata.missing", extra={"boundary": "s3->lambda", "key": key})
+
+        logger.info("file.received", extra={"boundary": "s3->lambda", "bucket": bucket,
+                                            "key": key, "bytes": byte_count})
+
+        try:
+            result = process_object(s3, CFG, _rules(), bucket, key, cid, logger)
+            statuses.append(result["status"])
+        except RecoverableError as exc:
+            error_code = str(exc)
+            logger.error("file.retry", extra={"boundary": "s3->lambda", "key": key,
+                                              "error_type": "RecoverableError",
+                                              "error_code": error_code})
+            raise
+        except Exception as exc:
+            logger.error("file.failed", extra={"boundary": "s3->lambda", "key": key,
+                                               "error_type": type(exc).__name__})
+            raise
+
+    return {"files": len(statuses), "statuses": statuses}
