@@ -78,7 +78,7 @@ class FunctionalTests(unittest.TestCase):
             day3.write_zones(_paths.FILE42, tmp, file_res, results, _paths.PKG_RULES, CID)
             for p in Path(tmp).rglob("*"):
                 if p.is_file() and "manifests" not in p.parts:
-                    key = str(p.relative_to(tmp))
+                    key = p.relative_to(tmp).as_posix()     # S3 keys use "/" on every OS
                     self.assertEqual(self.s3.objects[(B, key)]["Body"], p.read_bytes(), key)
 
     def test_resend_file_is_quarantined_as_schema(self):
