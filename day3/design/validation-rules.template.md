@@ -10,10 +10,10 @@ Routes: `quarantine` (→ `quarantine/<category>/`) · `flag` (→ `validated/` 
 |---|---|---|---|---|---|---|
 | R-01 | all | pnr, ticket_number, ... | must not be empty | required | quarantine | nothing to settle or trace without them |
 | R-02 | PNR | pnr | 6 upper-case letters/digits | format | quarantine | |
-|  | airline code | airline_code |  |  |  | |
-|  | airline code | airline_code |  |  |  | |
-|  | fare class | fare_class |  |  |  | |
-|  | fare class | fare_class |  |  |  | |
+| R-03 | airline code | airline_code | 2 characters, letters or digits (digits allowed, e.g. 6E) | format | quarantine | an IATA airline code is always 2 characters |
+| R-10 | airline code | airline_code | is in the airlines reference list | referential | quarantine | we only settle airlines we have a contract for |
+| R-04 | fare class | fare_class | exactly 1 upper-case letter | format | quarantine | booking classes are single capital letters |
+| R-11 | fare class | fare_class | is in the published fare class list | referential | quarantine | a class the airline does not publish cannot be priced or refunded |
 |  | OD pair | od_pair |  |  |  | |
 |  | OD pair | od_pair |  |  |  | |
 |  | OD pair | od_pair |  |  |  | |
