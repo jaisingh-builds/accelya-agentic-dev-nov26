@@ -20,9 +20,12 @@ from botocore.exceptions import ClientError
 LEARNER_ID = os.environ.get("LEARNER_ID", "unknown")
 PROBE_ROLE_ARN = os.environ.get("PROBE_ROLE_ARN", "")
 PROBE_EXTERNAL_ID = os.environ.get("PROBE_EXTERNAL_ID", "")
+PROCESSED_TABLE = os.environ.get("PROCESSED_TABLE", "")
+CLAIM_TTL_DAYS = 30
 
 s3 = boto3.client("s3")
 sts = boto3.client("sts")
+dynamodb = boto3.client("dynamodb")
 
 _COLD_START = True          # module scope survives between warm invocations
 _INIT_AT = time.time()
@@ -52,6 +55,46 @@ def _correlation_id(bucket, key, request_id):
         return f"m1-{request_id[:8]}-{uuid.uuid4().hex[:6]}", head["ContentLength"]
     except ClientError:
         return f"m1-{request_id[:8]}-{uuid.uuid4().hex[:6]}", None
+
+
+def _claim_file(bucket, key, etag, correlation_id):
+    """Record bucket/key#etag once. True = first time seen, False = duplicate.
+
+    Same object bytes => same eTag, so this catches both a duplicate S3 delivery
+    and a resend of an identical file. A corrected file has a new eTag and is processed.
+    """
+    if not PROCESSED_TABLE:
+        return True
+    try:
+        dynamodb.put_item(
+            TableName=PROCESSED_TABLE,
+            Item={
+                "file_id": {"S": f"{bucket}/{key}#{etag}"},
+                "correlation_id": {"S": correlation_id},
+                "first_seen_ts": {"S": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+                "expires_at": {"N": str(int(time.time()) + CLAIM_TTL_DAYS * 86400)},
+            },
+            ConditionExpression="attribute_not_exists(file_id)",
+        )
+        return True
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            return False
+        emit("ERROR", "file.claim_failed", correlation_id, boundary="lambda->dynamodb",
+             bucket=bucket, key=key, error_type="ClientError",
+             error_code=e.response["Error"]["Code"])
+        raise
+
+
+def _release_claim(bucket, key, etag, correlation_id):
+    """Processing failed after the claim: remove it so the S3 retry is not skipped."""
+    try:
+        dynamodb.delete_item(TableName=PROCESSED_TABLE,
+                             Key={"file_id": {"S": f"{bucket}/{key}#{etag}"}})
+    except ClientError as e:
+        emit("ERROR", "file.claim_release_failed", correlation_id, boundary="lambda->dynamodb",
+             bucket=bucket, key=key, error_type="ClientError",
+             error_code=e.response["Error"]["Code"])
 
 
 def _count_records(bucket, key):
@@ -104,9 +147,21 @@ def handler(event, context):
     for record in event.get("Records", []):
         bucket = record["s3"]["bucket"]["name"]
         key = unquote_plus(record["s3"]["object"]["key"])
+        etag = record["s3"]["object"].get("eTag", "").strip('"')
         cid, size = _correlation_id(bucket, key, context.aws_request_id)
+        if not _claim_file(bucket, key, etag, cid):
+            emit("INFO", "file.duplicate_skipped", cid, boundary="lambda->dynamodb",
+                 bucket=bucket, key=key, bytes=size)
+            continue
         started = time.time()
-        rows = _count_records(bucket, key)
+        try:
+            rows = _count_records(bucket, key)
+        except ClientError as e:
+            emit("ERROR", "file.read_failed", cid, boundary="lambda->s3",
+                 bucket=bucket, key=key, error_type="ClientError",
+                 error_code=e.response["Error"]["Code"])
+            _release_claim(bucket, key, etag, cid)
+            raise
         emit("INFO", "file.received", cid,
              boundary="s3->lambda", bucket=bucket, key=key, bytes=size,
              record_count=rows, cold_start=cold,

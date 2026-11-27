@@ -74,6 +74,33 @@ Resources:
               - Effect: Allow
                 Action: s3:GetObject
                 Resource: !Sub 'arn:aws:s3:::accelya-m1-${LearnerId}-${AWS::AccountId}/raw/*'
+        - PolicyName: claim-processed-files
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt ProcessedFilesTable.Arn
+
+  # ---------- DynamoDB: one row per file already processed (duplicate guard) ----------
+  ProcessedFilesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'accelya-m1-${LearnerId}-processed-files'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: file_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: file_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
 
   # ---------- IAM: a second role the Lambda will try to assume ----------
   ReaderRole:
@@ -138,6 +165,7 @@ Resources:
           LEARNER_ID: !Ref LearnerId
           PROBE_ROLE_ARN: !If [CreateRoles, !GetAtt ReaderRole.Arn, '']
           PROBE_EXTERNAL_ID: !Ref ProbeExternalId
+          PROCESSED_TABLE: !Ref ProcessedFilesTable
       Events:
         RawUpload:
           Type: S3
@@ -157,6 +185,8 @@ Outputs:
     Value: !Ref IngestFunction
   LogGroup:
     Value: !Ref IngestLogGroup
+  ProcessedFilesTable:
+    Value: !Ref ProcessedFilesTable
   IngestRoleArn:
     Condition: CreateRoles
     Value: !GetAtt IngestRole.Arn
