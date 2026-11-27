@@ -30,6 +30,7 @@ def _rules():
     return _ruleset
 
 
+@logger.inject_lambda_context(clear_state=True)
 def handler(event, context):
     """For each S3 record in the event:
       1. bucket and key (unquote_plus the key)
@@ -43,4 +44,32 @@ def handler(event, context):
     Decorate the handler with Powertools' inject_lambda_context(clear_state=True) so every line carries
     cold_start and memory_limit_mb, and no key leaks from one invocation into the next.
     """
-    raise NotImplementedError("Lab 3: implement handler")
+    statuses = []
+    for record in event.get("Records", []):
+        bucket = record["s3"]["bucket"]["name"]
+        key = unquote_plus(record["s3"]["object"]["key"])
+        try:
+            head = s3.head_object(Bucket=bucket, Key=key)
+            size, cid = head.get("ContentLength"), (head.get("Metadata") or {}).get("correlation-id")
+        except ClientError:
+            size, cid = None, None        # process_object finds and classifies the real problem
+        minted = not (cid and CID_OK.fullmatch(cid))
+        if minted:
+            cid = "m4-" + context.aws_request_id[:12]
+        logger.set_correlation_id(cid)
+        if minted:
+            logger.warning("metadata.missing", extra={"bucket": bucket, "key": key})
+        received = {"boundary": "s3->lambda", "bucket": bucket, "key": key}
+        if size is not None:
+            received["bytes"] = size
+        logger.info("file.received", extra=received)
+        try:
+            result = process_object(s3, CFG, _rules(), bucket, key, cid, logger)
+        except RecoverableError as e:
+            logger.error("file.retry", extra={"error_type": "RecoverableError", "error_code": getattr(e, "code", "unknown")})
+            raise
+        except Exception as e:
+            logger.error("file.failed", extra={"error_type": type(e).__name__})
+            raise
+        statuses.append(result["status"])
+    return {"files": len(statuses), "statuses": statuses}
