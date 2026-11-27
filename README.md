@@ -100,6 +100,22 @@ bash day4/scripts/cleanup_day4.sh $L
 
 All data in this repo is synthetic. Never paste real customer data into prompts, logs or reviews.
 
+
+## Day 5 in one screen
+
+```bash
+source .venv/bin/activate && source day1/scripts/env.sh <your-id>
+git checkout main && git pull && git checkout -b day5-$L
+pip install -q -r requirements.txt                            # adds pyarrow 21.0.0 (same as the container image)
+
+# Every Day 5 command, in lab order: day5/LABS.md
+python3 day5/tests/run_tests.py                               # job tests 9/9, Dockerfile 0/8 -> 8/8 after Lab 2
+export AWS_PROFILE=accelya && source day5/scripts/env.sh $L   # sets S, B, REPO, IMG, CL, TD, LG, WG, GDB (+ SUBNET, SG after deploy)
+(cd day5 && sam deploy --template-file template.yaml --stack-name $S $F --parameter-overrides LearnerId=$L GlueDatabase=$GDB)
+python3 day5/scripts/check_recon.py                           # Lab 4: reconciliation 2/2
+bash day5/scripts/cleanup_day5.sh $L
+```
+
 ## Layout
 
 | Path | What |
@@ -110,7 +126,7 @@ All data in this repo is synthetic. Never paste real customer data into prompts,
 | `docs/LOGGING_CONTRACT.md` | The logging standard every artefact is reviewed against (from Day 2) |
 | `docs/REFERENCE_ARCHITECTURE.md` | The agreed refund-pipeline architecture (Day 2) that Modules 6–10 build on; diagram in `docs/reference-architecture.png` |
 | `glossary/airline.md` | Airline vocabulary |
-| `day1/` … `day4/` | Per-module code, data, prompts, scripts, tests |
+| `day1/` … `day5/` | Per-module code, data, prompts, scripts, tests |
 | `slides/` | Day slides (pptx + pdf) |
 
 ## Rules of the road

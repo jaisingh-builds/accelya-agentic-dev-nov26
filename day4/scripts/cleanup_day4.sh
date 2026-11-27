@@ -6,7 +6,7 @@ export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
 ACCT=$(aws sts get-caller-identity --query Account --output text)
 BUCKET="accelya-m4-${L}-${ACCT}"
 STACK="accelya-m4-${L}"
-if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+if aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then
   echo "Emptying s3://${BUCKET} ..."
   aws s3 rm "s3://${BUCKET}" --recursive --quiet
 fi
