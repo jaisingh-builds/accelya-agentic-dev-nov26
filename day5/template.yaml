@@ -1,0 +1,253 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Accelya M5 - containerised batch + catalogue. validated/ -> ECS Fargate run-task (enrich) -> curated/ Parquet,
+  registered in the Glue Data Catalog and queried with Athena. One stack per learner: accelya-m5-<id>.
+
+Parameters:
+  LearnerId:
+    Type: String
+    AllowedPattern: '^[a-z0-9-]{2,20}$'
+    ConstraintDescription: 2-20 chars, lowercase letters, digits, hyphen
+  GlueDatabase:
+    Type: String
+    AllowedPattern: '^accelya_m5_[a-z0-9_]{2,20}$'
+    Description: accelya_m5_<id> with hyphens as underscores (Glue names allow no hyphen). env.sh computes it.
+  ImageTag:
+    Type: String
+    Default: v1                    # an explicit tag, never 'latest': the task definition says exactly what runs
+  LogLevel:
+    Type: String
+    AllowedValues: [DEBUG, INFO, WARNING, ERROR]
+    Default: INFO
+
+Resources:
+  # ---------- storage ----------
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub accelya-m5-${LearnerId}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: athena-results-7d
+            Status: Enabled
+            Prefix: athena-results/
+            ExpirationInDays: 7
+
+  # ---------- image ----------
+  ImageRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub accelya-m5-${LearnerId}-enrich
+      ImageTagMutability: IMMUTABLE          # v1 always means the same image; a change is v2
+      ImageScanningConfiguration: {ScanOnPush: true}
+      EmptyOnDelete: true
+      LifecyclePolicy:
+        LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"keep the last 5 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}'
+
+  # ---------- network: a public subnet so the task can pull from ECR and reach S3 (no NAT gateway, no cost) ----------
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.50.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{Key: Name, Value: !Sub 'accelya-m5-${LearnerId}'}]
+  Igw:
+    Type: AWS::EC2::InternetGateway
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: {VpcId: !Ref Vpc, InternetGatewayId: !Ref Igw}
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.50.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags: [{Key: Name, Value: !Sub 'accelya-m5-${LearnerId}-public'}]
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttach
+    Properties: {RouteTableId: !Ref RouteTable, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref Igw}
+  SubnetRoute:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref PublicSubnet, RouteTableId: !Ref RouteTable}
+  TaskSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: enrich task - outbound only, nothing inbound
+      VpcId: !Ref Vpc
+      SecurityGroupEgress: [{IpProtocol: '-1', CidrIp: 0.0.0.0/0}]
+
+  # ---------- the task ----------
+  TaskLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /ecs/accelya-m5-${LearnerId}-enrich
+      RetentionInDays: 14                    # a setting from day one (Day 4's lesson)
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub accelya-m5-${LearnerId}
+  ExecutionRole:                             # used by ECS itself: pull the image, write the logs
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub accelya-m5-${LearnerId}-exec-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: sts:AssumeRole}]
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy]
+  TaskRole:                                  # used by YOUR code: read validated/, write curated/ and its manifest
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub accelya-m5-${LearnerId}-task-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: sts:AssumeRole}]
+      Policies:
+        - PolicyName: enrich-least-privilege
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt DataBucket.Arn
+                Condition: {StringLike: {'s3:prefix': ['validated/*']}}
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub ${DataBucket.Arn}/validated/*
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource:
+                  - !Sub ${DataBucket.Arn}/curated/ticket_issue/*
+                  - !Sub ${DataBucket.Arn}/manifests/curated/*
+  TaskDef:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub accelya-m5-${LearnerId}-enrich
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      Cpu: '512'                             # 0.5 vCPU
+      Memory: '1024'                         # 1 GB: 606 rows fit with room; size from the manifest, not by guess
+      RuntimePlatform: {CpuArchitecture: X86_64, OperatingSystemFamily: LINUX}
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: enrich
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/accelya-m5-${LearnerId}-enrich:${ImageTag}
+          Essential: true
+          Environment:                       # configuration, never secrets; CORRELATION_ID is set per run
+            - {Name: BUCKET, Value: !Ref DataBucket}
+            - {Name: LEARNER_ID, Value: !Ref LearnerId}
+            - {Name: INPUT_PREFIX, Value: validated/}
+            - {Name: OUTPUT_PREFIX, Value: curated/ticket_issue/}
+            - {Name: LOG_LEVEL, Value: !Ref LogLevel}
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref TaskLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: enrich
+
+  # ---------- catalogue + query ----------
+  GlueDb:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref GlueDatabase
+        Description: !Sub Accelya M5 curated data for ${LearnerId}. Tables are registered explicitly with Athena DDL (day5/sql).
+  WorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub accelya-m5-${LearnerId}
+      RecursiveDeleteOption: true
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        BytesScannedCutoffPerQuery: 104857600   # 100 MB: Athena cancels a query at this limit; you pay for what it scanned
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${DataBucket}/athena-results/
+          EncryptionConfiguration: {EncryptionOption: SSE_S3}
+
+  # ---------- fallback: build the image in AWS when local Docker isn't available ----------
+  BuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/accelya-m5-${LearnerId}-imagebuild
+      RetentionInDays: 7
+  BuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub accelya-m5-${LearnerId}-build-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{Effect: Allow, Principal: {Service: codebuild.amazonaws.com}, Action: sts:AssumeRole}]
+      Policies:
+        - PolicyName: build-and-push
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - {Effect: Allow, Action: ecr:GetAuthorizationToken, Resource: '*'}
+              - Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:InitiateLayerUpload, ecr:UploadLayerPart,
+                         ecr:CompleteLayerUpload, ecr:PutImage, ecr:BatchGetImage, ecr:DescribeImages]
+                Resource: !GetAtt ImageRepo.Arn
+              - {Effect: Allow, Action: s3:GetObject, Resource: !Sub '${DataBucket.Arn}/build/*'}
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub '${BuildLogGroup.Arn}:*'
+  ImageBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub accelya-m5-${LearnerId}-imagebuild
+      ServiceRole: !GetAtt BuildRole.Arn
+      TimeoutInMinutes: 15
+      Artifacts: {Type: NO_ARTIFACTS}
+      LogsConfig:
+        CloudWatchLogs: {Status: ENABLED, GroupName: !Ref BuildLogGroup}
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux-x86_64-standard:5.0
+        PrivilegedMode: true                   # needed to run docker inside the build
+        EnvironmentVariables:
+          - {Name: REPO_URI, Value: !GetAtt ImageRepo.RepositoryUri}
+          - {Name: IMAGE_TAG, Value: !Ref ImageTag}
+      Source:
+        Type: S3
+        Location: !Sub ${DataBucket}/build/job.zip
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - aws ecr get-login-password | docker login --username AWS --password-stdin ${REPO_URI%%/*}
+            build:
+              commands:
+                - docker build --platform linux/amd64 -t $REPO_URI:$IMAGE_TAG .
+            post_build:
+              commands:
+                - docker push $REPO_URI:$IMAGE_TAG
+
+Outputs:
+  BucketName: {Value: !Ref DataBucket}
+  RepositoryUri: {Value: !GetAtt ImageRepo.RepositoryUri}
+  ClusterName: {Value: !Ref Cluster}
+  TaskDefinition: {Value: !Ref TaskDef}
+  SubnetId: {Value: !Ref PublicSubnet}
+  SecurityGroupId: {Value: !Ref TaskSg}
+  TaskLogGroup: {Value: !Ref TaskLogGroup}
+  WorkGroup: {Value: !Ref WorkGroup}
+  GlueDatabase: {Value: !Ref GlueDb}
+  BuildProject: {Value: !Ref ImageBuild}
