@@ -225,7 +225,7 @@ def write_zones(path, zones, file_res, results, rules_path, cid):
             side = {"source_key": f"raw/{path.name}", "correlation_id": cid, "reason": reason,
                     "records": [{"source_line": r["line"], "rule_id": r["rule"]} for r in items if isinstance(r, dict)]
                     or [{"file_rule": file_res.get("rule"), "detail": file_res.get("detail")}]}
-            (folder / (path.name + ".sidecar.json")).write_text(json.dumps(side, indent=1))
+            (folder / (path.name + ".sidecar.json")).write_text(json.dumps(side, indent=1), newline="\n")   # same bytes on every OS
         written.append(out)
     counts = Counter(r["route"] for r in results)
     manifest = {
@@ -246,7 +246,7 @@ def write_zones(path, zones, file_res, results, rules_path, cid):
     manifest["balanced"] = total_out == len(rows)
     mf = zones / "manifests" / f"business_date={d}"
     mf.mkdir(parents=True, exist_ok=True)
-    (mf / (path.name + ".manifest.json")).write_text(json.dumps(manifest, indent=1))
+    (mf / (path.name + ".manifest.json")).write_text(json.dumps(manifest, indent=1), newline="\n")
     return written, manifest
 
 
